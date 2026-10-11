@@ -20,6 +20,9 @@ interface AppShellProps {
   onPresetHealthy: () => void;
   onPresetCyclone: () => void;
   onPresetGatewayLost: () => void;
+  onResetDefaults?: () => void;
+  scenarioFeedback?: { message: string; type: 'success' | 'warning' | 'error' | 'info' } | null;
+  onClearFeedback?: () => void;
   selectedVillage?: VillageConfig;
   selectedVillageS72?: S72VillageSummary;
   selectedVillageIllusion?: VillageChannelStatus;
@@ -38,6 +41,9 @@ export const AppShell: React.FC<AppShellProps> = ({
   onPresetHealthy,
   onPresetCyclone,
   onPresetGatewayLost,
+  onResetDefaults,
+  scenarioFeedback,
+  onClearFeedback,
   selectedVillage,
   selectedVillageS72,
   selectedVillageIllusion,
@@ -61,12 +67,46 @@ export const AppShell: React.FC<AppShellProps> = ({
         onPresetHealthy={onPresetHealthy}
         onPresetCyclone={onPresetCyclone}
         onPresetGatewayLost={onPresetGatewayLost}
+        onResetDefaults={onResetDefaults}
         isDemoActive={isDemoActive}
         onStartDemo={onStartDemo}
       />
 
       {/* 1.1 Guided Demo Tour Ribbon (Active only during Evaluator Demo) */}
       {demoTourNode}
+
+      {/* 1.2 Feedback Banner for Scenario & Reset Actions */}
+      {scenarioFeedback && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`border-b px-4 py-2 text-xs font-mono-numbers transition-colors ${
+            scenarioFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : scenarioFeedback.type === 'warning'
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : scenarioFeedback.type === 'error'
+              ? 'bg-red-50 border-red-200 text-red-900'
+              : 'bg-blue-50 border-blue-200 text-blue-900'
+          }`}
+        >
+          <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 font-medium">
+              <span className="w-2 h-2 rounded-full shrink-0 bg-current" />
+              <span>{scenarioFeedback.message}</span>
+            </span>
+            {onClearFeedback && (
+              <button
+                onClick={onClearFeedback}
+                aria-label="Dismiss feedback notification"
+                className="text-slate-500 hover:text-slate-800 p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 2. Mobile Breadcrumb Sub-bar (< lg) */}
       <div className="lg:hidden bg-slate-100 border-b border-[var(--border)] px-4 py-2 flex items-center justify-between text-xs font-mono-numbers">

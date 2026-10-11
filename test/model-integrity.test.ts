@@ -1,13 +1,17 @@
 /**
  * PEREGRINE — Comprehensive Model Integrity & Algorithmic Audit Test Suite
  * Master Verification Suite connecting test/model, test/metrics, test/planner, and test/integrity.
- * Validates Sections 6, 7, 8, 9, 10, 11 of Project Bible (115 assertions).
+ * Validates Sections 6, 7, 8, 9, 10, 11 of Project Bible (178 assertions).
  */
 
 import { runModelTests } from './model/model.test';
 import { runMetricsTests } from './metrics/metrics.test';
 import { runPlannerTests } from './planner/planner.test';
 import { runIntegrityTests } from './integrity/integrity.test';
+import { runIntegrationTests } from './integration/integration.test';
+import { runScenarioControlsTests } from './model/scenario-controls.test';
+import { runSilenceClockTests } from './metrics/silence-clock.test';
+import { runRedundancyIllusionTests } from './metrics/redundancy-illusion.test';
 
 let passCount = 0;
 let failCount = 0;
@@ -49,6 +53,18 @@ runPlannerTests(assert, assertClose);
 
 // 4. Integrity Layer (Tests 9, 17)
 runIntegrityTests(assert, assertClose);
+
+// 5. Integration Layer (End-to-End Pipeline)
+runIntegrationTests(assert, assertClose);
+
+// 6. Scenario Controls Layer (Module 3 Presets & Transitions)
+runScenarioControlsTests(assert, assertClose);
+
+// 7. Silence Clock & Outage Analysis Layer (Module 4)
+runSilenceClockTests(assert, assertClose);
+
+// 8. Redundancy Illusion & Dependency Audit Layer (Module 5)
+runRedundancyIllusionTests(assert, assertClose);
 
 // Final Summary
 console.log('\n======================================================');

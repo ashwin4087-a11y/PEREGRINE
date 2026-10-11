@@ -47,8 +47,7 @@ peregrine/
 │   │   ├── planner/                     # DecisionEngineView: Comparative optimization workbench
 │   │   ├── outage-matrix/               # OutagePlanMatrix: 72-hour hourly restoration matrix
 │   │   ├── cryptography/                # AuditPanel: W3C ECDSA signature verification & tamper audit
-│   │   ├── experiments/                 # SensitivityPanel, ExperimentLogView: Seeds & baselines
-│   │   └── dashboard/                   # High-level overview widgets & summaries
+│   │   └── experiments/                 # SensitivityPanel, ExperimentLogView: Seeds & baselines
 │   │
 │   ├── pages/                           # Application Views & Route Pages
 │   │   ├── OverviewPage.tsx             # System summary & key performance indicators
@@ -91,26 +90,27 @@ peregrine/
 │   │   ├── sensitivity.ts               # ±30% parametric stress tests (reach, decay, power)
 │   │   └── runner.ts                    # Deterministic batch runner & checksum verification
 │   │
-│   ├── hooks/                           # Custom React hooks (scenario state, timers, responsiveness)
-│   ├── services/                        # Service wrappers for external browser APIs
 │   ├── styles/                          # Styling & Design Tokens
 │   │   ├── tokens.css                   # Retro-utility palette, monospace tokens, status badges
 │   │   └── index.css                    # Master stylesheet importing Tailwind & tokens
-│   ├── types/                           # Global TypeScript ambient definitions
+│   ├── App.tsx                          # Root controller compatibility export
+│   ├── index.css                        # Stylesheet compatibility export
 │   └── main.tsx                         # React 19 application entry point
 │
-├── test/                                # Modular Automated Verification Suite (119 Assertions)
-│   ├── model/                           # Pure simulation tests (S30 BFS, S72 restoration)
+├── test/                                # Modular Automated Verification Suite (178 Assertions)
+│   ├── model/                           # Pure simulation tests (S30 BFS, S72 restoration, failure modes)
 │   ├── metrics/                         # Metric calculation tests (reach, silence, redundancy)
 │   ├── planner/                         # Planner tests (budgets, fairness floors, frontier, baselines)
 │   ├── integrity/                       # Integrity tests (ECDSA signing, tampering, seeds)
 │   ├── integration/                     # Cross-module workflow & end-to-end integration
-│   └── model-integrity.test.ts          # Master regression orchestrator (119 tests passing)
+│   └── model-integrity.test.ts          # Master regression orchestrator (178 tests passing)
 │
 ├── docs/                                # Technical Documentation & Hackathon Materials
-│   ├── PEREGRINE_PROJECT_BIBLE.md       # Definitive Project Bible & specifications
 │   ├── DEMO_SCRIPT.md                   # 3-Minute demonstration script & canonical Q&A
-│   └── PITCH_DECK_REVISION_PLAN.md      # Evidence-based slide revision plan
+│   ├── IMPLEMENTATION_STATUS.md         # Full feature audit status matrix & evidence
+│   ├── PEREGRINE_PROJECT_BIBLE.md       # Definitive Project Bible & specifications (v2.1)
+│   ├── PITCH_DECK_REVISION_PLAN.md      # Evidence-based slide revision plan
+│   └── REFACTOR_PLAN.md                 # Dependency-ordered refactoring roadmap
 │
 ├── index.html                           # HTML shell
 ├── package.json                         # Project dependencies and npm scripts
@@ -152,7 +152,7 @@ bun install
 # 2. Run local development server (port 3000)
 npm run dev
 
-# 3. Execute automated test suite (all 119 assertions)
+# 3. Execute automated test suite (all 123 assertions)
 npm test
 
 # 4. Run type checker / linter

@@ -27,6 +27,7 @@ export interface NetworkFailureState {
   fm_tx: boolean;
   gateway: boolean;
   gateway_backup?: boolean;
+  mesh_nodes_down?: string[];     // optional list of village IDs whose mesh node has failed
 }
 
 export interface ActiveInterventions {
@@ -66,6 +67,10 @@ export interface VillageChannelStatus {
   availableCount: number;
   n1Guaranteed: number;
   commonCauseNodes: string[];
+  singlePointsOfFailure?: string[];
+  worstCaseNode?: string | null;
+  nominalChannels?: ChannelType[];
+  availableChannels?: ChannelType[];
 }
 
 export interface S30VillageMetric {

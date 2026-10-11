@@ -4,7 +4,7 @@
  * subsystem diagnostics, and 72-hour outage chronology.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SystemConfig } from '../model/config';
 import { 
   NetworkFailureState, 
@@ -13,6 +13,12 @@ import {
   S72Result, 
   VillageChannelStatus 
 } from '../model/types';
+import { 
+  ScenarioSummary, 
+  ActiveFailureDetail, 
+  getScenarioSummary, 
+  getActiveFailuresList 
+} from '../model/graph';
 import { NetworkMapAndGraph } from '../components/network/NetworkMapAndGraph';
 import { SilenceClockGrid } from '../components/silence-clock/SilenceClockGrid';
 import { RedundancyIllusionPanel } from '../components/redundancy-illusion/RedundancyIllusionPanel';
@@ -32,7 +38,11 @@ import {
   RotateCcw,
   AlertTriangle,
   ShieldCheck,
-  Compass
+  Compass,
+  CheckCircle2,
+  CloudLightning,
+  Info,
+  X
 } from 'lucide-react';
 
 interface OverviewPageProps {
@@ -49,6 +59,13 @@ interface OverviewPageProps {
   setInterventions: React.Dispatch<React.SetStateAction<ActiveInterventions>>;
   onNavigateToPlanner: () => void;
   onResetDefaults?: () => void;
+  onPresetHealthy?: () => void;
+  onPresetCyclone?: () => void;
+  onPresetGatewayLost?: () => void;
+  scenarioSummary?: ScenarioSummary;
+  activeFailuresList?: ActiveFailureDetail[];
+  scenarioFeedback?: { message: string; type: 'success' | 'warning' | 'error' | 'info' } | null;
+  onClearFeedback?: () => void;
 }
 
 export const OverviewPage: React.FC<OverviewPageProps> = ({
@@ -64,17 +81,41 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   onSelectVillage,
   setInterventions,
   onNavigateToPlanner,
-  onResetDefaults
+  onResetDefaults,
+  onPresetHealthy,
+  onPresetCyclone,
+  onPresetGatewayLost,
+  scenarioSummary,
+  activeFailuresList,
+  scenarioFeedback,
+  onClearFeedback
 }) => {
   const [copied, setCopied] = useState(false);
 
+  // Authoritative scenario summary & active failures list
+  const summary = useMemo(() => {
+    return scenarioSummary || getScenarioSummary(failures, interventions);
+  }, [scenarioSummary, failures, interventions]);
+
+  const activeList = useMemo(() => {
+    return activeFailuresList || getActiveFailuresList(failures, interventions);
+  }, [activeFailuresList, failures, interventions]);
+
+  const isHealthyPreset = activeList.length === 0;
+  const isCyclonePreset = failures.power_west && failures.power_east && failures.fibre && !failures.gateway;
+  const isGatewayLostPreset = failures.power_west && failures.power_east && failures.fibre && failures.gateway;
+
   const handleCopyJson = () => {
     const payload = {
-      scenario: 'PEREGRINE Disaster Resilience Simulation',
+      scenario: summary.scenarioName,
+      status: summary.status,
+      headline: summary.headline,
       disclaimer: 'SIMULATION · FICTIONAL DATA',
       exportedAt: new Date().toISOString(),
       failures,
       interventions,
+      causes: summary.causes,
+      mitigations: summary.mitigations,
       metrics: {
         s30ResilienceScore: s30Result.resilienceScore,
         s30CellOnly: s30Result.cellOnlyResilience,
@@ -110,6 +151,246 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         </div>
       </div>
 
+      {/* 1. Dedicated Disaster Scenario Controls, Feedback & Dependency Cascade Card */}
+      <div className="utility-card p-4 sm:p-5 rounded-[4px] border-2 border-slate-300 bg-white space-y-4 font-mono-numbers text-xs shadow-xs">
+        {/* Header: Scenario Identity & Status Badge */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+          <div className="flex items-center gap-2.5">
+            <div className={`p-2 rounded-[3px] ${
+              summary.status === 'OPERATIONAL'
+                ? 'bg-emerald-50 text-emerald-700'
+                : summary.status === 'DEGRADED'
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-red-50 text-red-700'
+            }`}>
+              {summary.status === 'OPERATIONAL' && <CheckCircle2 className="w-5 h-5" />}
+              {summary.status === 'DEGRADED' && <CloudLightning className="w-5 h-5" />}
+              {summary.status === 'CRITICAL' && <ShieldAlert className="w-5 h-5" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[0.65rem] text-slate-500 uppercase tracking-wider font-semibold">
+                  ACTIVE SCENARIO:
+                </span>
+                <span className={`px-2 py-0.5 rounded-[2px] font-extrabold text-[0.72rem] tracking-wide ${
+                  summary.status === 'OPERATIONAL'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : summary.status === 'DEGRADED'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : 'bg-red-100 text-red-800 border border-red-300'
+                }`}>
+                  {summary.status}
+                </span>
+              </div>
+              <h3 className="font-heading font-extrabold text-base text-[var(--navy)]">
+                {summary.scenarioName}
+              </h3>
+            </div>
+          </div>
+
+          {/* Quick Scenario Preset Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            {onPresetHealthy && (
+              <button
+                onClick={onPresetHealthy}
+                aria-pressed={isHealthyPreset}
+                aria-label="Activate Healthy Grid preset. Clears all simulated failures."
+                className={`px-3 py-1.5 rounded-[3px] border font-bold text-xs flex items-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                  isHealthyPreset
+                    ? 'bg-emerald-50 border-emerald-400 text-emerald-800 shadow-xs ring-1 ring-emerald-400'
+                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Healthy Grid</span>
+              </button>
+            )}
+
+            {onPresetCyclone && (
+              <button
+                onClick={onPresetCyclone}
+                aria-pressed={isCyclonePreset}
+                aria-label="Activate Cyclone Landfall preset. Sets West Grid, East Grid, and Fibre cuts."
+                className={`px-3 py-1.5 rounded-[3px] border font-bold text-xs flex items-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                  isCyclonePreset
+                    ? 'bg-red-50 border-red-400 text-red-800 shadow-xs ring-1 ring-red-400'
+                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <CloudLightning className="w-3.5 h-3.5 text-red-600" />
+                <span>Cyclone Hits</span>
+              </button>
+            )}
+
+            {onPresetGatewayLost && (
+              <button
+                onClick={onPresetGatewayLost}
+                aria-pressed={isGatewayLostPreset}
+                aria-label="Activate Gateway Loss preset. Cuts primary satellite gateway."
+                className={`px-3 py-1.5 rounded-[3px] border font-bold text-xs flex items-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                  isGatewayLostPreset
+                    ? 'bg-amber-100 border-amber-400 text-amber-900 shadow-xs ring-1 ring-amber-400'
+                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                <span>Gateway Lost</span>
+              </button>
+            )}
+
+            {onResetDefaults && (
+              <button
+                onClick={onResetDefaults}
+                aria-label="Reset simulation to initial scenario: clears failures and interventions"
+                className="px-2.5 py-1.5 rounded-[3px] border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)]"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Narrative Headline */}
+        <div className="p-3 bg-slate-50 border border-slate-200 rounded text-slate-800 text-[0.75rem] leading-relaxed">
+          <p className="font-sans font-medium">{summary.headline}</p>
+        </div>
+
+        {/* Action / Reset Feedback Banner */}
+        {scenarioFeedback && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`p-2.5 rounded-[3px] border flex items-center justify-between gap-2 text-[0.72rem] ${
+              scenarioFeedback.type === 'success'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                : scenarioFeedback.type === 'warning'
+                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                : scenarioFeedback.type === 'error'
+                ? 'bg-red-50 border-red-300 text-red-900'
+                : 'bg-blue-50 border-blue-300 text-blue-900'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full shrink-0 bg-current" />
+              <span>{scenarioFeedback.message}</span>
+            </div>
+            {onClearFeedback && (
+              <button
+                onClick={onClearFeedback}
+                aria-label="Dismiss message"
+                className="text-slate-500 hover:text-slate-900 p-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--amber)]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Visible Active Failures List & Component Status */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[0.68rem] text-slate-600 font-bold uppercase tracking-wider">
+              ACTIVE INFRASTRUCTURE FAILURES ({activeList.length} OF 7 SUBSYSTEMS)
+            </span>
+            <span className="text-[0.65rem] text-slate-500">
+              Click any component to restore or inject failure
+            </span>
+          </div>
+
+          {activeList.length === 0 ? (
+            <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-[3px] flex items-center gap-2 text-emerald-800 text-[0.72rem]">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                <strong>Zero Active Failures:</strong> All 7 infrastructure subsystems are operating normally. Terrestrial power grids, core fibre backhaul, cell broadcast towers, fixed FM, and satellite gateway links are fully operational.
+              </span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {activeList.map((item, idx) => (
+                <div
+                  key={`${String(item.key)}-${idx}`}
+                  className="p-2.5 rounded-[3px] border border-red-200 bg-red-50/60 flex flex-col justify-between gap-2 shadow-2xs"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[0.62rem] px-1.5 py-0.5 rounded-[2px] font-bold uppercase bg-slate-200 text-slate-700">
+                        {item.category}
+                      </span>
+                      <span className={`text-[0.62rem] px-1.5 py-0.5 rounded-[2px] font-extrabold ${
+                        item.status === 'DEGRADED'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-red-100 text-red-800 border border-red-300'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <div className="font-heading font-bold text-xs text-[var(--navy)]">
+                      {item.label}
+                    </div>
+                    <p className="text-[0.68rem] text-slate-700 mt-1 leading-snug">
+                      {item.impact}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (item.key !== 'mesh_nodes_down') {
+                        onToggleFailure(item.key);
+                      }
+                    }}
+                    aria-label={`Restore ${item.label}`}
+                    className="mt-1 px-2 py-1 rounded-[2px] border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-[0.65rem] flex items-center justify-center gap-1 transition-colors self-start"
+                  >
+                    <RotateCcw className="w-3 h-3 text-slate-500" />
+                    <span>Restore Component</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Scenario Summary: Root-Cause Dependencies & Mitigations */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-200 text-[0.72rem]">
+          {/* Root-Cause Dependencies */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded space-y-1.5">
+            <span className="text-[0.65rem] text-[var(--navy)] font-bold uppercase tracking-wider block">
+              ROOT-CAUSE DEPENDENCY PROPAGATION:
+            </span>
+            {summary.causes.length === 0 ? (
+              <p className="text-slate-600 italic">No failure propagation active. Grid and backhaul fully intact.</p>
+            ) : (
+              <ul className="space-y-1 text-slate-700 font-sans list-disc list-inside">
+                {summary.causes.map((cause, i) => (
+                  <li key={i} className="leading-snug">
+                    <span>{cause}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Active Mitigations */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded space-y-1.5">
+            <span className="text-[0.65rem] text-[var(--navy)] font-bold uppercase tracking-wider block">
+              ACTIVE MITIGATIONS &amp; RECOVERY:
+            </span>
+            {summary.mitigations.length === 0 ? (
+              <p className="text-slate-600 italic">No emergency interventions currently deployed.</p>
+            ) : (
+              <ul className="space-y-1 text-slate-700 font-sans list-disc list-inside">
+                {summary.mitigations.map((mit, i) => (
+                  <li key={i} className="leading-snug text-emerald-800">
+                    <span>{mit}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Action Bar: Export, Reset, Simulation Notice */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white border border-[var(--border)] rounded-[4px] font-mono-numbers text-xs">
         <div className="flex items-center gap-2">
@@ -121,7 +402,8 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={handleCopyJson}
-            className="px-2.5 py-1.5 rounded-[3px] border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold flex items-center gap-1.5 transition-colors"
+            aria-label="Copy simulation state and metrics as JSON"
+            className="px-2.5 py-1.5 rounded-[3px] border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)]"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? 'Copied Run JSON!' : 'Copy Run as JSON'}</span>
@@ -129,7 +411,8 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           {onResetDefaults && (
             <button
               onClick={onResetDefaults}
-              className="px-2.5 py-1.5 rounded-[3px] border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold flex items-center gap-1.5 transition-colors"
+              aria-label="Reset simulation defaults"
+              className="px-2.5 py-1.5 rounded-[3px] border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)]"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset Defaults</span>
@@ -303,59 +586,199 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           </div>
 
           <div className="space-y-1.5 text-[0.72rem]">
-            <div className="flex justify-between items-center p-1.5 bg-slate-50 rounded-[2px]">
+            {/* West Power Grid */}
+            <button
+              onClick={() => onToggleFailure('power_west')}
+              aria-pressed={failures.power_west}
+              aria-label={`West Power Grid. Currently ${failures.power_west ? 'Unavailable cut' : 'Operational'}. Click to toggle.`}
+              className={`w-full flex justify-between items-center p-1.5 rounded-[2px] border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                failures.power_west
+                  ? 'bg-red-50/80 border-red-200 hover:bg-red-100/80'
+                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
               <span className="flex items-center gap-1.5">
-                <Zap className="w-3 h-3 text-slate-500" /> West Power Grid (Tower A)
+                <Zap className={`w-3 h-3 ${failures.power_west ? 'text-red-500' : 'text-slate-500'}`} />
+                <span>West Power Grid (Tower A)</span>
               </span>
-              <span className={`font-bold ${failures.power_west ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
-                {failures.power_west ? 'TRIPPED [CUT]' : 'OPERATIONAL'}
+              <span className={`font-bold text-[0.68rem] ${failures.power_west ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
+                {failures.power_west ? 'UNAVAILABLE [CUT]' : 'OPERATIONAL'}
               </span>
-            </div>
+            </button>
 
-            <div className="flex justify-between items-center p-1.5 bg-slate-50 rounded-[2px]">
+            {/* East Power Grid */}
+            <button
+              onClick={() => onToggleFailure('power_east')}
+              aria-pressed={failures.power_east}
+              aria-label={`East Power Grid. Currently ${
+                !failures.power_east
+                  ? 'Operational'
+                  : interventions.backup_generation
+                  ? 'Degraded with generator active'
+                  : 'Unavailable cut'
+              }. Click to toggle.`}
+              className={`w-full flex justify-between items-center p-1.5 rounded-[2px] border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                !failures.power_east
+                  ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                  : interventions.backup_generation
+                  ? 'bg-amber-50/80 border-amber-200 hover:bg-amber-100/80'
+                  : 'bg-red-50/80 border-red-200 hover:bg-red-100/80'
+              }`}
+            >
               <span className="flex items-center gap-1.5">
-                <Zap className="w-3 h-3 text-slate-500" /> East Power Grid (Tower B / FM)
+                <Zap className={`w-3 h-3 ${failures.power_east ? 'text-amber-500' : 'text-slate-500'}`} />
+                <span>East Power Grid (Tower B / FM)</span>
               </span>
-              <span className={`font-bold ${failures.power_east ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
-                {failures.power_east ? 'TRIPPED [CUT]' : 'OPERATIONAL'}
+              <span className={`font-bold text-[0.68rem] ${
+                !failures.power_east
+                  ? 'text-[var(--green-text)]'
+                  : interventions.backup_generation
+                  ? 'text-[var(--amber-text)]'
+                  : 'text-[var(--red-text)]'
+              }`}>
+                {!failures.power_east
+                  ? 'OPERATIONAL'
+                  : interventions.backup_generation
+                  ? 'DEGRADED (GEN ACTIVE)'
+                  : 'UNAVAILABLE [CUT]'}
               </span>
-            </div>
+            </button>
 
-            <div className="flex justify-between items-center p-1.5 bg-slate-50 rounded-[2px]">
+            {/* Core Fibre */}
+            <button
+              onClick={() => onToggleFailure('fibre')}
+              aria-pressed={failures.fibre}
+              aria-label={`Core Fibre Backhaul. Currently ${failures.fibre ? 'Unavailable severed' : 'Operational'}. Click to toggle.`}
+              className={`w-full flex justify-between items-center p-1.5 rounded-[2px] border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                failures.fibre
+                  ? 'bg-red-50/80 border-red-200 hover:bg-red-100/80'
+                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
               <span className="flex items-center gap-1.5">
-                <Wifi className="w-3 h-3 text-slate-500" /> Core Fibre Backhaul
+                <Wifi className={`w-3 h-3 ${failures.fibre ? 'text-red-500' : 'text-slate-500'}`} />
+                <span>Core Fibre Backhaul</span>
               </span>
-              <span className={`font-bold ${failures.fibre ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
-                {failures.fibre ? 'SEVERED' : 'ACTIVE'}
+              <span className={`font-bold text-[0.68rem] ${failures.fibre ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
+                {failures.fibre ? 'UNAVAILABLE [SEVERED]' : 'OPERATIONAL'}
               </span>
-            </div>
+            </button>
 
-            <div className="flex justify-between items-center p-1.5 bg-slate-50 rounded-[2px]">
+            {/* Tower A */}
+            <button
+              onClick={() => onToggleFailure('tower_A')}
+              aria-pressed={failures.tower_A}
+              aria-label={`Cellular Tower A North. Currently ${failures.tower_A ? 'Unavailable down' : 'Operational'}. Click to toggle.`}
+              className={`w-full flex justify-between items-center p-1.5 rounded-[2px] border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                failures.tower_A
+                  ? 'bg-red-50/80 border-red-200 hover:bg-red-100/80'
+                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
               <span className="flex items-center gap-1.5">
-                <Signal className="w-3 h-3 text-slate-500" /> Cellular Tower A &amp; B
+                <Signal className={`w-3 h-3 ${failures.tower_A ? 'text-red-500' : 'text-slate-500'}`} />
+                <span>Cellular Tower A (North)</span>
               </span>
-              <span className={`font-bold ${failures.tower_A || failures.tower_B ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
-                {failures.tower_A && failures.tower_B ? 'BOTH DOWN' : failures.tower_A ? 'A DOWN' : failures.tower_B ? 'B DOWN' : 'ON-AIR'}
+              <span className={`font-bold text-[0.68rem] ${failures.tower_A ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
+                {failures.tower_A ? 'UNAVAILABLE [DOWN]' : 'OPERATIONAL'}
               </span>
-            </div>
+            </button>
 
-            <div className="flex justify-between items-center p-1.5 bg-slate-50 rounded-[2px]">
+            {/* Tower B */}
+            <button
+              onClick={() => onToggleFailure('tower_B')}
+              aria-pressed={failures.tower_B}
+              aria-label={`Cellular Tower B South. Currently ${failures.tower_B ? 'Unavailable down' : 'Operational'}. Click to toggle.`}
+              className={`w-full flex justify-between items-center p-1.5 rounded-[2px] border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                failures.tower_B
+                  ? 'bg-red-50/80 border-red-200 hover:bg-red-100/80'
+                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
               <span className="flex items-center gap-1.5">
-                <Radio className="w-3 h-3 text-slate-500" /> FM Transmitter (102.4 MHz)
+                <Signal className={`w-3 h-3 ${failures.tower_B ? 'text-red-500' : 'text-slate-500'}`} />
+                <span>Cellular Tower B (South)</span>
               </span>
-              <span className={`font-bold ${failures.fm_tx ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
-                {failures.fm_tx ? 'OFF-AIR' : 'TRANSMITTING'}
+              <span className={`font-bold text-[0.68rem] ${failures.tower_B ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
+                {failures.tower_B ? 'UNAVAILABLE [DOWN]' : 'OPERATIONAL'}
               </span>
-            </div>
+            </button>
 
-            <div className="flex justify-between items-center p-1.5 bg-slate-50 rounded-[2px]">
+            {/* FM Transmitter */}
+            <button
+              onClick={() => onToggleFailure('fm_tx')}
+              aria-pressed={failures.fm_tx}
+              aria-label={`FM Transmitter. Currently ${
+                !failures.fm_tx
+                  ? 'Operational transmitting'
+                  : interventions.mobile_broadcast_unit
+                  ? 'Degraded with mobile unit active'
+                  : 'Unavailable off-air'
+              }. Click to toggle.`}
+              className={`w-full flex justify-between items-center p-1.5 rounded-[2px] border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                !failures.fm_tx
+                  ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                  : interventions.mobile_broadcast_unit
+                  ? 'bg-amber-50/80 border-amber-200 hover:bg-amber-100/80'
+                  : 'bg-red-50/80 border-red-200 hover:bg-red-100/80'
+              }`}
+            >
               <span className="flex items-center gap-1.5">
-                <Radio className="w-3 h-3 text-slate-500" /> Marina Satellite Gateway
+                <Radio className={`w-3 h-3 ${failures.fm_tx ? 'text-amber-500' : 'text-slate-500'}`} />
+                <span>FM Transmitter (102.4 MHz)</span>
               </span>
-              <span className={`font-bold ${failures.gateway ? 'text-[var(--red-text)]' : 'text-[var(--green-text)]'}`}>
-                {failures.gateway ? 'FEED LOST' : 'FEEDING MESH'}
+              <span className={`font-bold text-[0.68rem] ${
+                !failures.fm_tx
+                  ? 'text-[var(--green-text)]'
+                  : interventions.mobile_broadcast_unit
+                  ? 'text-[var(--amber-text)]'
+                  : 'text-[var(--red-text)]'
+              }`}>
+                {!failures.fm_tx
+                  ? 'OPERATIONAL'
+                  : interventions.mobile_broadcast_unit
+                  ? 'DEGRADED (MOBILE TX)'
+                  : 'UNAVAILABLE [OFF-AIR]'}
               </span>
-            </div>
+            </button>
+
+            {/* Marina Satellite Gateway */}
+            <button
+              onClick={() => onToggleFailure('gateway')}
+              aria-pressed={failures.gateway}
+              aria-label={`Marina Satellite Gateway. Currently ${
+                !failures.gateway
+                  ? 'Operational feeding mesh'
+                  : interventions.second_gateway
+                  ? 'Degraded with redundant gateway active'
+                  : 'Unavailable feed lost'
+              }. Click to toggle.`}
+              className={`w-full flex justify-between items-center p-1.5 rounded-[2px] border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
+                !failures.gateway
+                  ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                  : interventions.second_gateway
+                  ? 'bg-amber-50/80 border-amber-200 hover:bg-amber-100/80'
+                  : 'bg-red-50/80 border-red-200 hover:bg-red-100/80'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Radio className={`w-3 h-3 ${failures.gateway ? 'text-red-500' : 'text-slate-500'}`} />
+                <span>Marina Satellite Gateway</span>
+              </span>
+              <span className={`font-bold text-[0.68rem] ${
+                !failures.gateway
+                  ? 'text-[var(--green-text)]'
+                  : interventions.second_gateway
+                  ? 'text-[var(--amber-text)]'
+                  : 'text-[var(--red-text)]'
+              }`}>
+                {!failures.gateway
+                  ? 'OPERATIONAL'
+                  : interventions.second_gateway
+                  ? 'DEGRADED (2ND GATEWAY)'
+                  : 'UNAVAILABLE [FEED LOST]'}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -511,6 +934,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         <SilenceClockGrid
           villages={s72Result.villages}
+          steps={s72Result.steps}
           totalScenarioHours={72}
           onSelectVillage={onSelectVillage}
           selectedVillageId={selectedVillageId}

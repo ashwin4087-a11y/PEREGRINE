@@ -26,6 +26,7 @@ interface HeaderProps {
   onPresetHealthy: () => void;
   onPresetCyclone: () => void;
   onPresetGatewayLost: () => void;
+  onResetDefaults?: () => void;
   isDemoActive?: boolean;
   onStartDemo?: () => void;
 }
@@ -38,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   onPresetHealthy,
   onPresetCyclone,
   onPresetGatewayLost,
+  onResetDefaults,
   isDemoActive = false,
   onStartDemo
 }) => {
@@ -84,7 +86,8 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onStartDemo}
               title="Launch 6-step guided walkthrough for evaluators and judges"
-              className={`px-3 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 font-bold transition-all ${
+              aria-label="Launch guided demo tour"
+              className={`px-3 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
                 isDemoActive
                   ? 'bg-[var(--amber)] border-[#D9822B] text-[var(--deep-navy)] shadow-sm ring-2 ring-[var(--amber)]/50'
                   : 'bg-[var(--navy)] border-[var(--navy)] text-white hover:bg-[#1B4B79] shadow-xs'
@@ -99,7 +102,9 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onPresetHealthy}
             title="Reset all infrastructure to healthy, baseline operational state"
-            className={`px-2.5 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 transition-all font-semibold ${
+            aria-label="Activate Healthy Grid scenario"
+            aria-pressed={isHealthyPreset}
+            className={`px-2.5 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 transition-all font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
               isHealthyPreset
                 ? 'bg-emerald-50 border-emerald-300 text-[var(--green-text)] shadow-xs'
                 : 'bg-white border-[var(--border)] text-slate-700 hover:bg-slate-50'
@@ -113,7 +118,9 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onPresetCyclone}
             title="Simulate correlated landfall: Power West + Power East + Core Fibre cut"
-            className={`px-2.5 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 transition-all font-semibold ${
+            aria-label="Activate Cyclone Landfall scenario"
+            aria-pressed={isCyclonePreset}
+            className={`px-2.5 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 transition-all font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
               isCyclonePreset
                 ? 'bg-red-50 border-red-300 text-[var(--red-text)] shadow-xs ring-1 ring-red-300'
                 : 'bg-white border-[var(--border)] text-slate-700 hover:bg-slate-50'
@@ -127,7 +134,9 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onPresetGatewayLost}
             title="Simulate complete satellite feed loss: Cyclone + Marina Gateway offline"
-            className={`px-2.5 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 transition-all font-semibold ${
+            aria-label="Activate Gateway Loss scenario"
+            aria-pressed={isGatewayLostPreset}
+            className={`px-2.5 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 transition-all font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
               isGatewayLostPreset
                 ? 'bg-amber-50 border-amber-300 text-[var(--amber-text)] shadow-xs ring-1 ring-amber-300'
                 : 'bg-white border-[var(--border)] text-slate-700 hover:bg-slate-50'
@@ -140,7 +149,9 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Active Fault Indicator / Drawer Toggle */}
           <button
             onClick={() => setIsFaultDrawerOpen(!isFaultDrawerOpen)}
-            className={`px-2.5 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 font-semibold transition-all ${
+            aria-label={`Toggle manual fault drawer. ${activeFailureCount} active faults.`}
+            aria-expanded={isFaultDrawerOpen}
+            className={`px-2.5 py-1.5 rounded-[3px] border text-xs flex items-center gap-1.5 font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
               activeFailureCount > 0
                 ? 'bg-amber-50 border-amber-300 text-[var(--amber-text)]'
                 : 'bg-slate-50 border-[var(--border)] text-[var(--muted)]'
@@ -149,36 +160,66 @@ export const Header: React.FC<HeaderProps> = ({
             <ShieldAlert className="w-3.5 h-3.5" />
             <span>{activeFailureCount} Faults Active</span>
           </button>
+
+          {/* Reset Defaults Button */}
+          {onResetDefaults && (
+            <button
+              onClick={onResetDefaults}
+              title="Reset simulation to initial state (clear all failures and interventions)"
+              aria-label="Reset simulation to initial state"
+              className="px-2.5 py-1.5 rounded-[3px] border border-[var(--border)] text-xs flex items-center gap-1.5 transition-all bg-white hover:bg-slate-50 text-slate-700 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)]"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Fault Drawer Popover */}
       {isFaultDrawerOpen && (
-        <div className="border-t border-b border-[var(--border)] bg-slate-50 px-4 sm:px-6 lg:px-8 py-3">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs font-mono-numbers">
-            <span className="text-[var(--navy)] font-bold">MANUAL FAULT INJECTION TOGGLES:</span>
+        <div 
+          role="region"
+          aria-label="Manual Fault Injection Controls"
+          className="border-t border-b border-[var(--border)] bg-slate-50 px-4 sm:px-6 lg:px-8 py-3"
+        >
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs font-mono-numbers">
+            <div className="flex items-center gap-2">
+              <span className="text-[var(--navy)] font-bold">MANUAL FAULT INJECTION TOGGLES:</span>
+              <span className="text-slate-500 text-[0.7rem] hidden sm:inline">(Click to toggle cut/normal state)</span>
+            </div>
             <div className="flex flex-wrap gap-2">
-              {(Object.keys(failures) as Array<keyof NetworkFailureState>).map(key => {
-                if (key === 'power_east_permanent' || key === 'gateway_backup') return null;
+              {[
+                { key: 'power_west' as const, label: 'WEST POWER' },
+                { key: 'power_east' as const, label: 'EAST POWER' },
+                { key: 'fibre' as const, label: 'CORE FIBRE' },
+                { key: 'tower_A' as const, label: 'TOWER A' },
+                { key: 'tower_B' as const, label: 'TOWER B' },
+                { key: 'fm_tx' as const, label: 'FM TX' },
+                { key: 'gateway' as const, label: 'SAT GATEWAY' },
+              ].map(({ key, label }) => {
                 const isFailed = failures[key];
                 return (
                   <button
                     key={key}
                     onClick={() => onToggleFailure(key)}
-                    className={`px-2 py-1 rounded-[2px] border text-[0.7rem] font-bold transition-all ${
+                    aria-pressed={isFailed}
+                    aria-label={`Toggle ${label} fault. Currently ${isFailed ? 'failed' : 'operational'}`}
+                    className={`px-2.5 py-1 rounded-[2px] border text-[0.72rem] font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
                       isFailed
-                        ? 'bg-red-100 border-red-300 text-red-800'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-red-100 border-red-300 text-red-800 shadow-xs ring-1 ring-red-400'
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    {key.toUpperCase()}: {isFailed ? 'FAILED [CUT]' : 'UP'}
+                    {label}: {isFailed ? 'FAILED [CUT]' : 'UP'}
                   </button>
                 );
               })}
             </div>
             <button
               onClick={() => setIsFaultDrawerOpen(false)}
-              className="text-xs text-slate-500 hover:text-slate-800 underline"
+              aria-label="Close fault injection drawer"
+              className="text-xs text-slate-500 hover:text-slate-800 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)]"
             >
               Close
             </button>

@@ -26,7 +26,9 @@ export * from './types';
 // Re-export simulation engines and metrics for backward-compatible consumption
 export { simulateS30 } from './simulateS30';
 export { simulateS72 } from './simulateS72';
-export { calculateRedundancyIllusion } from '../metrics/redundancy';
+export * from '../metrics/redundancy';
+export * from './scenario';
+export * from '../metrics/silence';
 
 export function createDefaultFailures(): NetworkFailureState {
   return {
@@ -38,7 +40,8 @@ export function createDefaultFailures(): NetworkFailureState {
     tower_B: false,
     fm_tx: false,
     gateway: false,
-    gateway_backup: false
+    gateway_backup: false,
+    mesh_nodes_down: []
   };
 }
 
@@ -85,7 +88,8 @@ export function computeMeshTopology(
 
   // Initialise node statuses
   for (const v of config.villages) {
-    const hasHardware = Boolean(v.meshNode || interventions.relay_nodes.includes(v.id));
+    const isNodeFailed = Boolean(failures.mesh_nodes_down?.includes(v.id));
+    const hasHardware = Boolean(v.meshNode || interventions.relay_nodes.includes(v.id)) && !isNodeFailed;
     const isGateway = activeGatewayIds.includes(v.id);
     nodesRecord[v.id] = {
       villageId: v.id,
@@ -200,21 +204,19 @@ export function isChannelAvailable(
 
   if (channel === 'fm') {
     if (!village.fm) return false;
-    if (failures.fm_tx) return false;
-
-    // Fixed transmitter power check
-    const hasFixedPower = !failures.power_east || interventions.backup_generation;
 
     // If simulating S72 at a specific hour
     if (hourInS72 !== null) {
       const gridBack = (hourInS72 >= config.s72.gridReturnH) && !failures.power_east_permanent;
       const genRunning = interventions.backup_generation && (hourInS72 < config.s72.generatorRuntimeH);
       const mobileActive = interventions.mobile_broadcast_unit && (hourInS72 >= config.s72.mobileUnitArrivalH);
-      return mobileActive || ((gridBack || genRunning) && !failures.fm_tx);
+      const fixedWorking = !failures.fm_tx && (gridBack || genRunning);
+      return Boolean(mobileActive || fixedWorking);
     }
 
-    // Default static evaluation (e.g. S30)
-    return hasFixedPower || interventions.mobile_broadcast_unit;
+    // Default static evaluation (e.g. S30 or Redundancy Illusion)
+    const fixedWorking = !failures.fm_tx && (!failures.power_east || interventions.backup_generation);
+    return Boolean(fixedWorking || interventions.mobile_broadcast_unit);
   }
 
   if (channel === 'mesh') {

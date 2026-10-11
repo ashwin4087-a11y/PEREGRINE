@@ -13,7 +13,15 @@ import {
 import { 
   simulateS30, 
   simulateS72, 
-  calculateRedundancyIllusion 
+  calculateRedundancyIllusion,
+  createDefaultFailures,
+  createEmptyInterventions,
+  applyHealthyPreset,
+  applyCyclonePreset,
+  applyGatewayLostPreset,
+  toggleFailureNode,
+  getScenarioSummary,
+  getActiveFailuresList
 } from '../model/graph';
 
 import { AppShell } from './layout/AppShell';
@@ -42,26 +50,17 @@ export default function App() {
   // Guided Demo Walkthrough Step State (0 to 5, or null when inactive)
   const [demoStep, setDemoStep] = useState<number | null>(null);
 
-  // Network Failure State
-  const [failures, setFailures] = useState<NetworkFailureState>({
-    power_west: false,
-    power_east: false,
-    fibre: false,
-    tower_A: false,
-    tower_B: false,
-    fm_tx: false,
-    gateway: false
-  });
+  // Network Failure State (initialized via shared factory)
+  const [failures, setFailures] = useState<NetworkFailureState>(createDefaultFailures);
 
-  // Active Interventions
-  const [interventions, setInterventions] = useState<ActiveInterventions>({
-    backup_generation: false,
-    mobile_broadcast_unit: false,
-    second_gateway: false,
-    relay_nodes: [],
-    siren_responders: [],
-    community_kits: []
-  });
+  // Active Interventions (initialized via shared factory)
+  const [interventions, setInterventions] = useState<ActiveInterventions>(createEmptyInterventions);
+
+  // Scenario Action & Reset Confirmation Feedback
+  const [scenarioFeedback, setScenarioFeedback] = useState<{
+    message: string;
+    type: 'success' | 'warning' | 'error' | 'info';
+  } | null>(null);
 
   // Active Navigation Tab
   const [activeTab, setActiveTab] = useState<NavTabId>('overview');
@@ -71,81 +70,62 @@ export default function App() {
 
   // Toggle single failure
   const handleToggleFailure = (nodeKey: keyof NetworkFailureState) => {
-    setFailures(prev => ({ ...prev, [nodeKey]: !prev[nodeKey] }));
+    setFailures(prev => {
+      const next = toggleFailureNode(prev, nodeKey);
+      const isFailed = next[nodeKey];
+      setScenarioFeedback({
+        message: `Failure toggled: ${String(nodeKey).toUpperCase()} is now ${isFailed ? 'FAILED [CUT]' : 'OPERATIONAL'}.`,
+        type: isFailed ? 'warning' : 'info'
+      });
+      return next;
+    });
   };
 
   // Preset: Healthy Grid
   const handlePresetHealthy = () => {
-    setFailures({
-      power_west: false,
-      power_east: false,
-      fibre: false,
-      tower_A: false,
-      tower_B: false,
-      fm_tx: false,
-      gateway: false
+    setFailures(applyHealthyPreset());
+    setScenarioFeedback({
+      message: 'Scenario activated: Healthy Grid — All infrastructure restored to baseline operational state.',
+      type: 'success'
     });
   };
 
   // Preset: Cyclone Hits (Compound Failure)
   const handlePresetCyclone = () => {
-    setFailures({
-      power_west: true,
-      power_east: true,
-      fibre: true,
-      tower_A: false,
-      tower_B: false,
-      fm_tx: false,
-      gateway: false
+    setFailures(applyCyclonePreset());
+    setScenarioFeedback({
+      message: 'Scenario activated: Cyclone Landfall — West Grid, East Grid, and Core Fibre severed.',
+      type: 'warning'
     });
   };
 
   // Preset: Gateway Lost (Dedicated demo beat: Cyclone + Gateway Cut)
   const handlePresetGatewayLost = () => {
     if (!failures.gateway) {
-      setFailures({
-        power_west: true,
-        power_east: true,
-        fibre: true,
-        tower_A: false,
-        tower_B: false,
-        fm_tx: false,
-        gateway: true
+      setFailures(applyGatewayLostPreset());
+      setScenarioFeedback({
+        message: 'Scenario activated: Gateway Loss — Marina satellite gateway severed; mesh alert reach drops to 0.0%.',
+        type: 'error'
       });
     } else {
-      setFailures({
-        power_west: true,
-        power_east: true,
-        fibre: true,
-        tower_A: false,
-        tower_B: false,
-        fm_tx: false,
-        gateway: false
+      setFailures(applyCyclonePreset());
+      setScenarioFeedback({
+        message: 'Marina Gateway restored — Returned to Cyclone Landfall baseline.',
+        type: 'info'
       });
     }
   };
 
   const handleResetDefaults = () => {
     setConfig(INITIAL_CONFIG);
-    setFailures({
-      power_west: false,
-      power_east: false,
-      fibre: false,
-      tower_A: false,
-      tower_B: false,
-      fm_tx: false,
-      gateway: false
-    });
-    setInterventions({
-      backup_generation: false,
-      mobile_broadcast_unit: false,
-      second_gateway: false,
-      relay_nodes: [],
-      siren_responders: [],
-      community_kits: []
-    });
+    setFailures(createDefaultFailures());
+    setInterventions(createEmptyInterventions());
     setSelectedVillageId(null);
     setDemoStep(null);
+    setScenarioFeedback({
+      message: 'System Reset: Initial configuration restored, all failures cleared, and interventions reset.',
+      type: 'info'
+    });
   };
 
   // Run S30 alert-window simulation
@@ -170,10 +150,22 @@ export default function App() {
       .reduce((sum, v) => sum + v.pop, 0);
   }, [s72Result]);
 
+  // Scenario summary explaining causes and status
+  const scenarioSummary = useMemo(() => {
+    return getScenarioSummary(failures, interventions);
+  }, [failures, interventions]);
+
+  // Active failures list with component status labels and impacts
+  const activeFailuresList = useMemo(() => {
+    return getActiveFailuresList(failures, interventions);
+  }, [failures, interventions]);
+
   // Selected village details
   const selectedVillage = config.villages.find(v => v.id === selectedVillageId);
   const selectedVillageS72 = s72Result.villages.find(v => v.id === selectedVillageId);
-  const selectedVillageIllusion = illusionStatus.find(v => v.villageId === selectedVillageId);  // 6-Step Guided Evaluator Demo Tour Definitions
+  const selectedVillageIllusion = illusionStatus.find(v => v.villageId === selectedVillageId);
+
+  // 6-Step Guided Evaluator Demo Tour Definitions
   const demoSteps: DemoStepDefinition[] = useMemo(() => [
     {
       stepIndex: 0,
@@ -315,6 +307,9 @@ export default function App() {
       onPresetHealthy={handlePresetHealthy}
       onPresetCyclone={handlePresetCyclone}
       onPresetGatewayLost={handlePresetGatewayLost}
+      onResetDefaults={handleResetDefaults}
+      scenarioFeedback={scenarioFeedback}
+      onClearFeedback={() => setScenarioFeedback(null)}
       selectedVillage={selectedVillage}
       selectedVillageS72={selectedVillageS72}
       selectedVillageIllusion={selectedVillageIllusion}
@@ -350,14 +345,26 @@ export default function App() {
           setInterventions={setInterventions}
           onNavigateToPlanner={() => setActiveTab('planner')}
           onResetDefaults={handleResetDefaults}
+          onPresetHealthy={handlePresetHealthy}
+          onPresetCyclone={handlePresetCyclone}
+          onPresetGatewayLost={handlePresetGatewayLost}
+          scenarioSummary={scenarioSummary}
+          activeFailuresList={activeFailuresList}
+          scenarioFeedback={scenarioFeedback}
+          onClearFeedback={() => setScenarioFeedback(null)}
         />
       )}
 
       {activeTab === 'silence' && (
         <SilenceClockPage
-          villages={s72Result.villages}
+          config={config}
+          s72Result={s72Result}
+          failures={failures}
+          interventions={interventions}
           selectedVillageId={selectedVillageId}
           onSelectVillage={id => setSelectedVillageId(id)}
+          onToggleFailure={handleToggleFailure}
+          setInterventions={setInterventions}
         />
       )}
 
@@ -367,6 +374,15 @@ export default function App() {
           statusList={illusionStatus}
           selectedVillageId={selectedVillageId}
           onSelectVillage={id => setSelectedVillageId(id)}
+          failures={failures}
+          interventions={interventions}
+          onToggleFailure={handleToggleFailure}
+          setInterventions={setInterventions}
+          onApplyScenario={scenario => {
+            if (scenario === 'healthy') handlePresetHealthy();
+            else if (scenario === 'cyclone') handlePresetCyclone();
+            else if (scenario === 'gateway_loss') handlePresetGatewayLost();
+          }}
         />
       )}
 
