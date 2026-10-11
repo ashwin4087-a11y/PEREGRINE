@@ -1,0 +1,6 @@
+{
+  "name": "PEREGRINE — Disaster-Resilient Broadcast Network",
+  "description": "Decision-support simulation and emergency broadcast resilience planner for cascading infrastructure failures, Silence Clock, and fair recovery interventions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

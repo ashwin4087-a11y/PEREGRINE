@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+html, body {
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: 'Hind Madurai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  background-image: 
+    linear-gradient(to right, rgba(220, 229, 237, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(220, 229, 237, 0.35) 1px, transparent 1px);
+  background-size: 28px 28px;
+  overflow-y: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
