@@ -116,7 +116,7 @@ async function runFullStackVerification() {
 
   const app = createApp();
   let server: Server;
-  let testPort: number;
+  let testPort = 0;
 
   await new Promise<void>((resolve) => {
     server = app.listen(0, '127.0.0.1', () => {
