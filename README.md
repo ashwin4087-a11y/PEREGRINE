@@ -19,91 +19,52 @@ When severe disasters strike coastal regions (such as cyclones, storm surges, or
 
 ## 2. System Architecture & Feature-Oriented Project Structure
 
-PEREGRINE follows a clean, feature-oriented architecture with strict separation of concerns across presentation, simulation, metrics, planning, integrity, and test suites:
+PEREGRINE follows a clean, decoupled frontend/backend architecture with strict separation of concerns across presentation, simulation, metrics, planning, integrity, and test suites:
 
 ```text
-peregrine/
-├── public/
-│   └── assets/
-│       └── brand/                       # Official PEREGRINE vector branding
-│           ├── peregrine-lockup.svg
-│           ├── peregrine-lockup-dark.svg
-│           └── peregrine-symbol.svg
+PEREGRINE/
+├── frontend/                            # React 19 + TypeScript + Vite + Tailwind CSS Application
+│   ├── public/assets/brand/             # Official PEREGRINE vector branding (lockups & symbol)
+│   ├── src/
+│   │   ├── app/                         # App shell, router, header with API status badge, demo tour
+│   │   ├── pages/                       # Route views (Overview, Silence Clock, Redundancy, Decision Engine)
+│   │   ├── components/                  # Modular UI (network map, silence grid, optimizer workbench)
+│   │   ├── services/
+│   │   │   └── api.ts                   # Typed API client connecting to backend with local fallback
+│   │   ├── model/                       # Simulation engine client definitions & fallback models
+│   │   ├── metrics/                     # Mathematical calculation functions
+│   │   ├── planner/                     # Dual-objective recovery optimizer
+│   │   ├── integrity/                   # ECDSA alert signing & reproducible experiment runner
+│   │   ├── experiments/                 # Sensitivity benchmarks & parameter sweeps
+│   │   └── styles/                      # Design tokens and master stylesheet
+│   ├── test/                            # Frontend test suites (338 automated assertions)
+│   ├── package.json                     # Frontend scripts & dependencies
+│   ├── tsconfig.json                    # Frontend TypeScript configuration
+│   ├── vite.config.ts                   # Vite configuration with /api reverse proxy
+│   └── .env.example                     # Frontend environment template
 │
-├── src/
-│   ├── app/                             # Top-level Application Shell & Navigation
-│   │   ├── App.tsx                      # Root workspace state, scenario controller & active route
-│   │   ├── routes.tsx                   # Centralised navigation definitions & tab identifiers
-│   │   └── layout/                      # Application chrome & responsive frames
-│   │       ├── AppShell.tsx             # Master grid, offline badge, layout container
-│   │       ├── Header.tsx               # Official falcon branding & sticky navigation tabs
-│   │       └── Footer.tsx               # IEEE BTS Hackathon attribution & disclaimer
-│   │
-│   ├── components/                      # Modular UI Presentation Layer
-│   │   ├── ui/                          # Shared UI primitives (PeregrineLogo, cards, badges)
-│   │   ├── network/                     # NetworkMapAndGraph: Topographical map & physical topology
-│   │   ├── silence-clock/               # SilenceClockGrid: Real-time community blackout status
-│   │   ├── redundancy-illusion/         # RedundancyIllusionPanel: Nominal vs actual vs N-1 audit
-│   │   ├── planner/                     # DecisionEngineView: Comparative optimization workbench
-│   │   ├── outage-matrix/               # OutagePlanMatrix: 72-hour hourly restoration matrix
-│   │   ├── cryptography/                # AuditPanel: W3C ECDSA signature verification & tamper audit
-│   │   └── experiments/                 # SensitivityPanel, ExperimentLogView: Seeds & baselines
-│   │
-│   ├── pages/                           # Application Views & Route Pages
-│   │   ├── OverviewPage.tsx             # System summary & key performance indicators
-│   │   ├── SilenceClockPage.tsx         # Dedicated community silence duration view
-│   │   ├── RedundancyPage.tsx           # Correlated failure audit & single-point analysis
-│   │   ├── DecisionEnginePage.tsx       # Reach Maximisation vs Fairness-Floor Optimizer
-│   │   ├── OutageMatrixPage.tsx         # 72-hour restoration timeline & step simulator
-│   │   ├── CryptographyPage.tsx         # ECDSA P-256 digital signing & tamper detection
-│   │   └── StressBaselinesPage.tsx      # ±30% parametric stress tests & baselines (A-D)
-│   │
-│   ├── model/                           # Pure Simulation Engine & Centralised Parameters
-│   │   ├── types.ts                     # Core domain types (NodeId, ChannelType, FailureState, etc.)
-│   │   ├── config.ts                    # Centralised parameters, channel reach, timings, costs
-│   │   ├── graph.ts                     # Euclidean topology, distance checks, availability matrix
-│   │   ├── simulateS30.ts               # Pure 30-min alert window simulation & multi-hop BFS
-│   │   └── simulateS72.ts               # Pure 72-hour outage simulation & utility restoration
-│   │
-│   ├── metrics/                         # Shared Metrics & Mathematical Calculations
-│   │   ├── reach.ts                     # Village reach, independent union, population-weighted reach
-│   │   ├── silence.ts                   # Silence duration, cumulative blackout hours, low service
-│   │   ├── redundancy.ts                # Nominal diversity vs actual vs N-1 single points of failure
-│   │   └── resilience.ts                # Time-decay penalty models & aggregate resilience score
-│   │
-│   ├── planner/                         # Dual-Objective Decision Engine & Optimization
-│   │   ├── types.ts                     # Planner domain interfaces & configuration options
-│   │   ├── objectives.ts                # Reach Maximiser and Fairness-Floor evaluation logic
-│   │   ├── interventions.ts             # Candidate interventions, budget constraints, mutation
-│   │   ├── baselines.ts                 # Baselines A (Cell-only), B (Static FM), C (Greedy)
-│   │   └── engine.ts                    # Greedy search, plan execution, comparative analysis
-│   │
-│   ├── integrity/                       # Cryptographic Integrity & Tamper Protection
-│   │   ├── sign.ts                      # W3C Web Crypto ECDSA P-256 emergency alert signing
-│   │   ├── verify.ts                    # Cryptographic signature validation & integrity checking
-│   │   ├── withdraw.ts                  # Cryptographic alert cancellation & withdrawal notices
-│   │   ├── crypto.ts                    # Audio alert synthesis & CAP XML formatters
-│   │   └── experiment.ts                # Seeded deterministic experiment runner & checksums
-│   │
-│   ├── experiments/                     # Empirical Stress-Testing & Batch Runners
-│   │   ├── types.ts                     # Experiment batch parameters and sensitivity types
-│   │   ├── sensitivity.ts               # ±30% parametric stress tests (reach, decay, power)
-│   │   └── runner.ts                    # Deterministic batch runner & checksum verification
-│   │
-│   ├── styles/                          # Styling & Design Tokens
-│   │   ├── tokens.css                   # Retro-utility palette, monospace tokens, status badges
-│   │   └── index.css                    # Master stylesheet importing Tailwind & tokens
-│   ├── App.tsx                          # Root controller compatibility export
-│   ├── index.css                        # Stylesheet compatibility export
-│   └── main.tsx                         # React 19 application entry point
+├── backend/                             # Node.js + Express + TypeScript Deterministic API Server
+│   ├── src/
+│   │   ├── server.ts                    # HTTP server entry point (port 3001)
+│   │   ├── app.ts                       # Express application factory & middleware pipeline
+│   │   ├── routes/                      # Route declarations (/health, /scenarios, /simulations, etc.)
+│   │   ├── controllers/                 # Validated HTTP request handlers & standardized responses
+│   │   ├── services/                    # Application coordination services
+│   │   ├── engine/                      # Authoritative network simulation (S30 & S72 models)
+│   │   ├── metrics/                     # Authoritative calculations (reach, silence, redundancy, N-1)
+│   │   ├── planner/                     # Authoritative recovery interventions & Pareto frontier
+│   │   ├── integrity/                   # Cryptographic signing, verification, and tamper detection
+│   │   ├── experiments/                 # Deterministic seeded experiments & ±30% sensitivity sweeps
+│   │   ├── middleware/                  # Centralized error handler and CORS protection
+│   │   ├── config/                      # Infrastructure parameters and server configuration
+│   │   └── types/                       # Shared API data transfer objects & contracts
+│   ├── test/                            # Backend test suites (66 automated assertions)
+│   ├── package.json                     # Backend scripts & dependencies
+│   ├── tsconfig.json                    # Backend TypeScript configuration
+│   └── .env.example                     # Backend environment template
 │
-├── test/                                # Modular Automated Verification Suite (178 Assertions)
-│   ├── model/                           # Pure simulation tests (S30 BFS, S72 restoration, failure modes)
-│   ├── metrics/                         # Metric calculation tests (reach, silence, redundancy)
-│   ├── planner/                         # Planner tests (budgets, fairness floors, frontier, baselines)
-│   ├── integrity/                       # Integrity tests (ECDSA signing, tampering, seeds)
-│   ├── integration/                     # Cross-module workflow & end-to-end integration
-│   └── model-integrity.test.ts          # Master regression orchestrator (178 tests passing)
+├── tests/                               # Full-stack architectural acceptance tests (54 assertions)
+│   └── full-stack.test.ts               # End-to-end structure & live HTTP client/server verification
 │
 ├── docs/                                # Technical Documentation & Hackathon Materials
 │   ├── DEMO_SCRIPT.md                   # 3-Minute demonstration script & canonical Q&A
@@ -112,59 +73,105 @@ peregrine/
 │   ├── PITCH_DECK_REVISION_PLAN.md      # Evidence-based slide revision plan
 │   └── REFACTOR_PLAN.md                 # Dependency-ordered refactoring roadmap
 │
-├── index.html                           # HTML shell
-├── package.json                         # Project dependencies and npm scripts
-├── tsconfig.json                        # TypeScript compiler options
-├── vite.config.ts                       # Vite configuration
-└── README.md                            # Comprehensive system documentation
+├── scripts/                             # Orchestration & Process Management
+│   └── dev.js                           # Concurrent development runner (Frontend + Backend)
+│
+├── package.json                         # Root workspace scripts coordinating all components
+├── tsconfig.json                        # Root TypeScript configuration
+├── README.md                            # Comprehensive system documentation
+└── .gitignore                           # Repository ignore configuration
 ```
 
 ### Architectural Separation of Responsibilities
 
-- **Presentation Layer (`src/app/`, `src/pages/`, `src/components/`)**:
-  Pure React components, route definitions, application chrome, and layout frames. UI components consume computed results strictly through typed model and metrics interfaces; they never contain duplicated reach formulas, planner heuristics, or hardcoded simulation outputs.
-- **Model Layer (`src/model/`)**:
-  Pure, deterministic simulation functions and centralised configurations. S30 (30-minute rapid-onset decay) and S72 (72-hour extended outage) are isolated because their time scales and physics differ. Contains zero DOM dependencies and no unseeded randomness.
-- **Metrics Layer (`src/metrics/`)**:
-  Calculates resilience scores, community reach, blackout durations, and the Redundancy Illusion index. All dashboards, charts, and audit views derive their scores from these single-source-of-truth functions.
-- **Planner Layer (`src/planner/`)**:
-  Encapsulates intervention budgets, candidate generation, greedy search, fairness-floor constraints, Pareto frontier sweeps, and baseline comparisons (A, B, C vs D). Enforces honest reporting when fairness floors are mathematically infeasible.
-- **Integrity & Experiments Layer (`src/integrity/`, `src/experiments/`)**:
-  W3C Web Crypto (ECDSA P-256) signing, verification, withdrawal alerts, seeded pseudorandom generators (Mulberry32, FNV-1a), and sensitivity sweeps.
-- **Automated Verification Layer (`test/`)**:
-  Modular test suites for unit testing each architectural layer, unified under `test/model-integrity.test.ts` to guarantee zero regressions across the 119 passing assertions.
+- **Frontend Application (`frontend/`)**:
+  Pure React 19 UI with responsive desktop/mobile shells, interactive timeline grids, settlement dependency inspectors, live topology graphs, dual-objective optimizer workbench, and cryptographic audit panels. Consumes computed results through the typed client (`frontend/src/services/api.ts`). If the backend is running, it communicates over HTTP; if the backend is offline, it transparently falls back to the in-memory engine, displaying an unambiguous connection status badge (`API CONNECTED` vs `LOCAL ENGINE`).
+- **Backend API Server (`backend/`)**:
+  Node.js + Express + TypeScript HTTP service exposing validated REST endpoints under `/api`. Houses the authoritative simulation engine (`backend/src/engine/`), metrics calculations (`backend/src/metrics/`), recovery planner (`backend/src/planner/`), cryptographic integrity (`backend/src/integrity/`), and reproducible experiments (`backend/src/experiments/`). Does not use fake or hardcoded mock data; all responses are computed dynamically from the authoritative mathematical model.
+- **Root Orchestration & Tests (`scripts/`, `tests/`)**:
+  Root workspace scripts coordinate building, type-checking, and testing both workspaces simultaneously. `tests/full-stack.test.ts` validates the file tree and boots the server on an ephemeral port to verify end-to-end HTTP communication.
 
 ---
 
-## 3. Installation & Development
+## 3. API Endpoints
+
+The backend exposes structured, validated HTTP REST endpoints returning consistent JSON envelopes (`{ success, data, error, timestamp }`):
+
+| Method | Endpoint | Description | Status Codes |
+|---|---|---|---|
+| `GET` | `/api/health` | Service health status, system uptime, memory usage, and version | `200` |
+| `GET` | `/api/scenarios` | Lists all 3 canonical disaster scenarios (Healthy, Cyclone, Gateway Loss) | `200` |
+| `GET` | `/api/scenarios/:id` | Returns failure state and description for a specific scenario preset | `200`, `404` |
+| `GET` | `/api/scenarios/components` | Enumerates all 7 critical failure infrastructure components | `200` |
+| `POST` | `/api/simulations/run` | Executes authoritative S30 alert-decay and S72 outage simulations | `200`, `400` |
+| `POST` | `/api/redundancy/analyze` | Evaluates Nominal vs Available vs N-1 Guaranteed channels and CCF nodes | `200`, `400` |
+| `POST` | `/api/planner/recommend` | Evaluates Reach-Maximiser (Plan A) vs Fairness-Floor (Plan B) and Pareto frontier | `200`, `400` |
+| `POST` | `/api/experiments/run` | Generates seeded deterministic audit records and runs sensitivity sweeps | `200`, `400` |
+
+---
+
+## 4. Installation & Development
 
 ### Prerequisites
-- Node.js >= 20.x or Bun >= 1.2
-- npm, pnpm, or bun
+- Node.js >= 20.x
+- npm
 
-### Commands
+### Quick Start
 ```bash
-# 1. Install dependencies
-npm install
-# or
-bun install
+# 1. Install all dependencies across root, frontend, and backend
+npm run install:all
 
-# 2. Run local development server (port 3000)
+# 2. Start full-stack development environment concurrently
+# (Backend on :3001, Frontend on :3000 with automatic /api proxy)
 npm run dev
 
-# 3. Execute automated test suite (all 123 assertions)
+# 3. Run all automated tests (458 assertions across backend, frontend, and full-stack)
 npm test
 
-# 4. Run type checker / linter
+# 4. Run type checker across both workspaces
 npm run lint
 
-# 5. Build production bundle
+# 5. Build production bundles for both frontend and backend
 npm run build
+```
+
+### Granular Workspace Commands
+```bash
+# Frontend only
+npm run dev:frontend      # Start Vite on port 3000
+npm run test:frontend     # Execute 338 frontend assertions
+npm run build:frontend    # Compile production Vite bundle
+
+# Backend only
+npm run dev:backend       # Start Express with hot reload on port 3001
+npm run test:backend      # Execute 66 backend unit & API assertions
+npm run build:backend     # Compile TypeScript to backend/dist/
+
+# Full-Stack Integration
+npm run test:fullstack    # Run end-to-end HTTP architecture integration test
 ```
 
 ---
 
-## 4. Simulation Methodology & Mathematical Formulations
+## 5. Environment Configuration
+
+### Backend (`backend/.env`)
+```bash
+PORT=3001
+FRONTEND_URL=http://localhost:3000
+NODE_ENV=development
+```
+
+### Frontend (`frontend/.env`)
+```bash
+VITE_API_URL=http://localhost:3001
+```
+
+If `VITE_API_URL` is omitted, the frontend Vite development server automatically proxies all `/api` requests to `http://localhost:3001`. If the backend server is unreachable, the frontend seamlessly executes simulations locally, preventing application crashes.
+
+---
+
+## 6. Simulation Methodology & Mathematical Formulations
 
 ### 4.1 S30 Alert Window (30 Minutes)
 Evaluates urgent early-warning dissemination during rapid-onset hazards:
@@ -195,7 +202,7 @@ Models prolonged infrastructure recovery and diesel generator lifespans:
 
 ---
 
-## 5. Centralised Model Assumptions
+## 7. Centralised Model Assumptions
 
 All assumptions are centralised in `src/model/config.ts` and explicitly distinguished:
 - **ASSUMED**: Modelled scenario planning parameters (uncited simulation values, inspectable and testable).
@@ -226,7 +233,7 @@ Modelled continuous siren availability reflects continuous alert readiness under
 
 ---
 
-## 6. Algorithmic Planner Results (Verified Test Vectors)
+## 8. Algorithmic Planner Results (Verified Test Vectors)
 
 ### Scenario: S72 Cyclone Outage at Budget 50 Units
 
@@ -256,7 +263,7 @@ Modelled continuous siren availability reflects continuous alert readiness under
 
 ---
 
-## 7. Guided Demo Mode (3-Minute Walkthrough)
+## 9. Guided Demo Mode (3-Minute Walkthrough)
 
 PEREGRINE includes a built-in **Demo Tour** accessible via the header button or keyboard (`Space` / `ArrowRight`):
 1. **Step 1: Healthy Network**: Baseline state with all links operating (~84.4% reach, 0 blackout hours).
@@ -268,13 +275,16 @@ PEREGRINE includes a built-in **Demo Tour** accessible via the header button or 
 
 ---
 
-## 8. Automated Test Suite
+## 10. Automated Test Suite
 
 Run the full verification suite:
 ```bash
 npm test
 ```
-The test suite executes **119 rigorous automated assertions** across 18 distinct test suites verifying:
+The unified test suite executes **458 rigorous automated assertions** with zero failures across three distinct layers:
+- **Backend Verification (66 assertions)**: Validates canonical disaster scenarios, authoritative S30 alert decay and S72 timeline simulation, N-1 guaranteed redundancy calculations, dual-objective recovery planning, deterministic seeded experiments, and all Express REST API endpoints (`/api/health`, `/api/scenarios`, `/api/simulations/run`, `/api/redundancy/analyze`, `/api/planner/recommend`, `/api/experiments/run`).
+- **Frontend Verification (338 assertions)**: Validates UI models, 72-hour Silence Clock grids, Redundancy Illusion calculations, multi-hop BFS graph traversal, ECDSA alert verification, and the frontend API client with transparent offline local engine fallback.
+- **Full-Stack Acceptance Tests (54 assertions)**: Inspects repository architecture, spins up a live backend server instance on an ephemeral port, and verifies real frontend-to-backend HTTP communication.
 - **Price-of-Fairness Frontier**: Monotonic non-increasing overall reach as floor rises, strict budget compliance, determinism, and 22.9% max-min verification.
 - **Zero Fabricated Multipliers**: `planResilience` computed via fresh simulation, completely eliminating arbitrary `* 1.03` factors.
 - **S30 Baseline Derivation**: Validates 53.95% authoritative multi-hop BFS calculation and contrasts with 54.26% naive 1-hop model (both round to 54.0%).
@@ -288,7 +298,7 @@ The test suite executes **119 rigorous automated assertions** across 18 distinct
 
 ---
 
-## 9. Unresolved Questions (Preserved from Project Bible)
+## 11. Unresolved Questions (Preserved from Project Bible)
 
 In compliance with project guidelines, the following questions remain open and un-fabricated pending committee decisions:
 - **Q2 (Judging Criteria)**: Exact weightings between raw population reach and fairness floor equity.

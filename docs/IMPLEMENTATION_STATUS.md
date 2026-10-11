@@ -128,4 +128,13 @@ The PEREGRINE core simulation, mathematical models, UI pages, and design system 
   - Interactive scenario comparison across Healthy Baseline, Cyclone Landfall, and Gateway Loss.
   - Real-time reactivity to intervention deployments (Substation Backup Generator, 2nd Gateway, Mobile Broadcast Unit, Community Kits, Siren Responders).
   - 56 dedicated Module 5 automated test assertions verifying independent vs shared dependencies, one vs multiple channels, shared power failures, shared gateway failures, redundant gateway recovery, disconnected settlements, and scenario transitions.
+- **Architecture Refactor: Frontend/Backend Decoupling & REST API** fully implemented and verified:
+  - Repository refactored into clean `frontend/`, `backend/`, `tests/`, `docs/`, `scripts/`, `package.json`, and `README.md` structure.
+  - Dedicated Git branch `refactor/frontend-backend-architecture` created and active.
+  - `backend/`: Node.js + Express + TypeScript HTTP service exposing validated REST endpoints (`/api/health`, `/api/scenarios`, `/api/simulations/run`, `/api/redundancy/analyze`, `/api/planner/recommend`, `/api/experiments/run`) backed by authoritative mathematical calculation engines (no hardcoded mocks).
+  - `frontend/`: React 19 + TypeScript + Vite application consuming real API responses via typed client `frontend/src/services/api.ts` with transparent offline local engine fallback and visual connection badge in header (`API CONNECTED` vs `LOCAL ENGINE`).
+  - `scripts/dev.js`: Spawns backend (port 3001) and frontend (port 3000) concurrently with clean prefixed logging and graceful process shutdown.
+  - `tests/full-stack.test.ts`: Verifies complete folder architecture and tests live frontend-to-backend HTTP communication against an in-memory server instance on an ephemeral port.
+  - **458 automated test assertions pass with 0 failures** across the unified test suite (66 backend assertions, 338 frontend assertions, 54 full-stack integration assertions).
+  - Production builds for both frontend (`vite build`, 322ms) and backend (`tsc`, exit 0) compile cleanly with zero TypeScript errors.
 
