@@ -1,0 +1,222 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --navy: #123B63;
+  --navy-deep: #0C2A47;
+  --bg: #F7FAFC;
+  --surface: #FFFFFF;
+  --ink: #17212B;
+  --muted: #5B6B80;
+  --border: #DCE5ED;
+  --border-light: #E9F0F6;
+  --green: #56A67A;
+  --green-text: #2E7D57;
+  --green-inset: #EBF7F0;
+  --amber: #F4B942;
+  --amber-text: #D99020;
+  --amber-inset: #FEF7EA;
+  --red: #C95C5C;
+  --red-text: #B23A3A;
+  --red-hatch: #9C2828;
+  --red-inset: #FDF2F2;
+  --shadow-sm: 0 1px 2px 0 rgba(18, 59, 99, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(18, 59, 99, 0.07), 0 2px 4px -2px rgba(18, 59, 99, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(18, 59, 99, 0.08), 0 4px 6px -4px rgba(18, 59, 99, 0.04);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html, body {
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: 'Hind Madurai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  background-image: 
+    linear-gradient(to right, rgba(220, 229, 237, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(220, 229, 237, 0.35) 1px, transparent 1px);
+  background-size: 28px 28px;
+  overflow-y: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.font-heading {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.font-mono-numbers {
+  font-family: 'Azeret Mono', monospace;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Retro-Utility Hardware Card (Section 14 Project Bible: 4px radius, clean 1px border) */
+.utility-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px 0 rgba(18, 59, 99, 0.05);
+}
+
+.utility-card-lg {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px 0 rgba(18, 59, 99, 0.06);
+}
+
+/* Tactile Mechanical Action Buttons (Section 14 Project Bible: 3px radius, mechanical depress) */
+.btn-tactile {
+  background-color: var(--navy);
+  color: #FFFFFF;
+  border: 1px solid #0C2A47;
+  border-radius: 3px;
+  font-family: 'Azeret Mono', monospace;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(18, 59, 99, 0.2);
+  transition: all 0.12s var(--ease);
+}
+
+.btn-tactile:hover {
+  background-color: #174878;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(18, 59, 99, 0.25);
+}
+
+.btn-tactile:active {
+  background-color: #0C2A47;
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.btn-tactile-secondary {
+  background-color: #FFFFFF;
+  color: var(--navy);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: 'Azeret Mono', monospace;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.12s var(--ease);
+}
+
+.btn-tactile-secondary:hover {
+  background-color: #F8FAFC;
+  border-color: #CBD5E1;
+  color: var(--navy-deep);
+}
+
+.btn-tactile-secondary:active {
+  background-color: #F1F5F9;
+  transform: translateY(1px);
+}
+
+.btn-tactile-danger {
+  background-color: var(--red);
+  color: #FFFFFF;
+  border: 1px solid #9C2828;
+  border-radius: 3px;
+  font-family: 'Azeret Mono', monospace;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(201, 92, 92, 0.2);
+  transition: all 0.12s var(--ease);
+}
+
+.btn-tactile-danger:hover {
+  background-color: #B23A3A;
+  transform: translateY(-1px);
+}
+
+.btn-tactile-danger:active {
+  transform: translateY(1px);
+}
+
+/* Rubber Ink Stamps & Badges (Section 14 Project Bible: 2px radius, uppercase tabular) */
+.stamp-label {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Azeret Mono', monospace;
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  line-height: 1.25;
+}
+
+.stamp-simulation {
+  color: #123B63;
+  background-color: rgba(18, 59, 99, 0.06);
+  border-color: rgba(18, 59, 99, 0.3);
+}
+
+.stamp-verified {
+  color: #2E7D57;
+  background-color: var(--green-inset);
+  border-color: rgba(86, 166, 122, 0.4);
+}
+
+.stamp-warning {
+  color: #D99020;
+  background-color: var(--amber-inset);
+  border-color: rgba(244, 185, 66, 0.5);
+}
+
+.stamp-critical {
+  color: #B23A3A;
+  background-color: var(--red-inset);
+  border-color: rgba(201, 92, 92, 0.4);
+}
+
+.stamp-withdrawn {
+  color: #5B6B80;
+  background-color: #EDF2F7;
+  border-color: #CBD5E1;
+}
+
+/* Diagonal Hazard Striping */
+.hazard-stripes {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(201, 92, 92, 0.06),
+    rgba(201, 92, 92, 0.06) 6px,
+    rgba(201, 92, 92, 0.14) 6px,
+    rgba(201, 92, 92, 0.14) 12px
+  );
+}
+
+/* Technical Accent Bar Under Header */
+.technical-header-stripe {
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(
+    to right,
+    #123B63 0%,
+    #123B63 45%,
+    #F4B942 45%,
+    #F4B942 80%,
+    #56A67A 80%,
+    #56A67A 100%
+  );
+}
+
+/* Odometer Chamber Inset (Section 14 Project Bible: 3px radius, #081D33) */
+.odometer-chamber {
+  background-color: #081D33;
+  border: 1px solid #0E2E50;
+  border-radius: 3px;
+  color: #FFFFFF;
+  font-family: 'Azeret Mono', monospace;
+  font-variant-numeric: tabular-nums lining-nums;
+}

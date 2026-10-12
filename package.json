@@ -1,29 +1,22 @@
 {
-  "name": "peregrine",
+  "name": "react-example",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/dev.js",
-    "dev:frontend": "npm run dev --prefix frontend",
-    "dev:backend": "npm run dev --prefix backend",
-    "build": "npm run build --prefix frontend && npm run build --prefix backend",
-    "build:frontend": "npm run build --prefix frontend",
-    "build:backend": "npm run build --prefix backend",
-    "test": "npm run test:backend && npm run test:frontend && npm run test:fullstack",
-    "test:frontend": "npm run test --prefix frontend",
-    "test:backend": "npm run test --prefix backend",
-    "test:fullstack": "tsx tests/full-stack.test.ts",
-    "lint": "npm run lint --prefix frontend && npm run lint --prefix backend",
-    "typecheck": "npm run lint --prefix frontend && npm run lint --prefix backend",
-    "install:all": "npm install && npm install --prefix frontend && npm install --prefix backend"
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist server.js",
+    "lint": "tsc --noEmit",
+    "test": "tsx test/model-integrity.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@types/leaflet": "^1.9.22",
     "@vitejs/plugin-react": "^6.1.1",
-    "cors": "^2.8.6",
     "dotenv": "^17.2.3",
-    "express": "^5.3.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
@@ -31,13 +24,11 @@
     "vite": "^8.3.0"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"
