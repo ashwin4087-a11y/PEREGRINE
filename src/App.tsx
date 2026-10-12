@@ -286,16 +286,6 @@ export default function App() {
               {isGatewayLostPreset ? 'Gateway Lost [SEVERED · 0%]' : 'Gateway Lost (Demo)'}
             </button>
 
-            {/* Optional Cryptographic Audit launcher */}
-            <button
-              onClick={() => setIsAuditModalOpen(true)}
-              title="Inspect WebCrypto ECDSA P-256 signatures, verification & siren alerts"
-              className="text-xs px-2.5 py-1.5 rounded-[3px] font-mono-numbers font-semibold bg-white border border-[var(--border)] text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] shadow-xs"
-            >
-              <Key className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden sm:inline">Crypto Integrity</span>
-            </button>
-
             <span className={`text-[0.7rem] px-2.5 py-1 rounded-[2px] font-mono-numbers font-bold border ${
               activeFailureCount === 0
                 ? 'bg-emerald-50 text-[var(--green-text)] border-emerald-200'
