@@ -22,11 +22,14 @@ import { INITIAL_CONFIG } from '../src/model/config';
 import { 
   createDefaultFailures, 
   createEmptyInterventions, 
+  applyHealthyPreset,
+  applyCyclonePreset,
+  applyGatewayLostPreset,
   simulateS30, 
   simulateS72, 
-  computeMeshTopology,
-  calculateRedundancyIllusion,
-  NetworkFailureState
+  computeMeshTopology, 
+  calculateRedundancyIllusion, 
+  NetworkFailureState 
 } from '../src/model/graph';
 import { runPlanner, compareRecoveryStrategies } from '../src/planner/engine';
 import { generateReproducibleExperiment } from '../src/integrity/experiment';
@@ -395,6 +398,63 @@ const replayB = generateReproducibleExperiment(INITIAL_CONFIG, cycloneFailures, 
 assert(replayA.experimentId === replayB.experimentId, 'Experiment ID is strictly deterministic');
 assert(replayA.checksum === replayB.checksum, 'Payload cryptographic checksum matches across replays');
 assert(replayA.checksum.startsWith('SHA256-SIM-'), 'Checksum contains SHA256-SIM prefix');
+
+// -----------------------------------------------------------------------------
+// Test 18: Deterministic Scenario State Transitions & Cross-Tab Invariants
+// -----------------------------------------------------------------------------
+console.log('\n--- Test 18: Deterministic Scenario Transitions & Cross-Tab Invariants ---');
+
+// Step 1: Healthy Baseline
+const baselineFailures = applyHealthyPreset();
+const baselineInterventions = createEmptyInterventions();
+const s30Baseline = simulateS30(INITIAL_CONFIG, baselineFailures, baselineInterventions, 0.5);
+const s72Baseline = simulateS72(INITIAL_CONFIG, baselineInterventions, 0.5, baselineFailures);
+const illusionBaseline = calculateRedundancyIllusion(INITIAL_CONFIG, baselineFailures, baselineInterventions);
+
+assert(s30Baseline.resilienceScore === 88.23, 'Healthy S30 total reach is exactly 88.23%');
+assert(s30Baseline.cellOnlyResilience === 78.07, 'Healthy S30 cell-only reach is exactly 78.07%');
+assert(s72Baseline.overallReach === 10.59, 'Healthy S72 time-averaged reach is exactly 10.59%');
+const silentPopBaseline = s72Baseline.villages.filter(v => v.silenceHours === 72).reduce((s, v) => s + v.pop, 0);
+assert(silentPopBaseline === 1500, 'Healthy S72 silent population under 72h blackout is exactly 1,500 (Thoni + Hill Camp)');
+
+// Check East Power common cause in baseline
+const karaiBaseline = illusionBaseline.find(v => v.villageId === 'karai');
+const uppalamBaseline = illusionBaseline.find(v => v.villageId === 'uppalam');
+const sagarBaseline = illusionBaseline.find(v => v.villageId === 'sagar');
+assert(karaiBaseline?.n1Guaranteed === 1, 'Karai N-1 guaranteed is strictly 1 in healthy baseline');
+assert(uppalamBaseline?.n1Guaranteed === 1, 'Uppalam N-1 guaranteed is strictly 1 in healthy baseline');
+assert(sagarBaseline?.n1Guaranteed === 1, 'Sagar N-1 guaranteed is strictly 1 in healthy baseline');
+assert(karaiBaseline?.commonCauseNodes.includes('power_east') === true, 'Karai identifies power_east as common-cause vulnerability');
+
+// Step 2: Transition to Severe Cyclone
+const cyclonePreset = applyCyclonePreset();
+assert(cyclonePreset.power_west && cyclonePreset.power_east && cyclonePreset.fibre && !cyclonePreset.gateway, 'Cyclone preset configures compound failure');
+const s30CycloneRun = simulateS30(INITIAL_CONFIG, cyclonePreset, baselineInterventions, 0.5);
+assert(s30CycloneRun.cellOnlyResilience === 0.0, 'Cyclone collapses cell-only reach to 0.00%');
+assertClose(s30CycloneRun.resilienceScore, 54.0, 0.5, 'Cyclone reach is ~54.0% via active mesh');
+
+// Step 3: Transition to Gateway Lost
+const gatewayLostPreset1 = applyGatewayLostPreset();
+const gatewayLostPreset2 = applyGatewayLostPreset();
+assert(gatewayLostPreset1.gateway === true, 'Gateway Lost sets gateway failure flag');
+assert(gatewayLostPreset2.gateway === true, 'Gateway Lost is idempotent and does not toggle off on repeated call');
+const s30GatewayRun = simulateS30(INITIAL_CONFIG, gatewayLostPreset1, baselineInterventions, 0.5);
+assert(s30GatewayRun.resilienceScore === 0.0, 'Gateway Lost collapses S30 reach to strictly 0.00%');
+
+// Step 4: Return to Healthy Grid
+const restoredFailures = applyHealthyPreset();
+const restoredInterventions = createEmptyInterventions();
+const s30Restored = simulateS30(INITIAL_CONFIG, restoredFailures, restoredInterventions, 0.5);
+const s72Restored = simulateS72(INITIAL_CONFIG, restoredInterventions, 0.5, restoredFailures);
+const illusionRestored = calculateRedundancyIllusion(INITIAL_CONFIG, restoredFailures, restoredInterventions);
+
+assert(s30Restored.resilienceScore === s30Baseline.resilienceScore, 'Healthy restoration achieves identical S30 resilience score (88.23%)');
+assert(s30Restored.cellOnlyResilience === s30Baseline.cellOnlyResilience, 'Healthy restoration achieves identical S30 cell-only resilience (78.07%)');
+assert(s72Restored.overallReach === s72Baseline.overallReach, 'Healthy restoration achieves identical S72 overall reach (10.59%)');
+const silentPopRestored = s72Restored.villages.filter(v => v.silenceHours === 72).reduce((s, v) => s + v.pop, 0);
+assert(silentPopRestored === silentPopBaseline, 'Healthy restoration restores silent population to 1,500');
+const karaiRestored = illusionRestored.find(v => v.villageId === 'karai');
+assert(karaiRestored?.n1Guaranteed === 1, 'Healthy restoration restores Karai N-1 guaranteed to 1');
 
 // -----------------------------------------------------------------------------
 // Final Summary

@@ -11,7 +11,12 @@ import {
   ActiveInterventions, 
   simulateS30, 
   simulateS72, 
-  calculateRedundancyIllusion 
+  calculateRedundancyIllusion,
+  createDefaultFailures,
+  createEmptyInterventions,
+  applyHealthyPreset,
+  applyCyclonePreset,
+  applyGatewayLostPreset
 } from './model/graph';
 import { PeregrineLogo } from './components/brand/PeregrineLogo';
 import { NetworkMapAndGraph } from './components/NetworkMapAndGraph';
@@ -84,25 +89,10 @@ export default function App() {
   const [config, setConfig] = useState<SystemConfig>(INITIAL_CONFIG);
 
   // Network Failure State
-  const [failures, setFailures] = useState<NetworkFailureState>({
-    power_west: false,
-    power_east: false,
-    fibre: false,
-    tower_A: false,
-    tower_B: false,
-    fm_tx: false,
-    gateway: false
-  });
+  const [failures, setFailures] = useState<NetworkFailureState>(createDefaultFailures);
 
   // Active Interventions
-  const [interventions, setInterventions] = useState<ActiveInterventions>({
-    backup_generation: false,
-    mobile_broadcast_unit: false,
-    second_gateway: false,
-    relay_nodes: [],
-    siren_responders: [],
-    community_kits: []
-  });
+  const [interventions, setInterventions] = useState<ActiveInterventions>(createEmptyInterventions);
 
   // Active Navigation Tab
   const [activeTab, setActiveTab] = useState<NavTabId>('overview');
@@ -131,62 +121,28 @@ export default function App() {
     setFailures(prev => ({ ...prev, [nodeKey]: !prev[nodeKey] }));
   };
 
-  // Preset: Healthy Grid
+  // Preset: Healthy Grid (restores baseline, clears interventions and plan banners)
   const handlePresetHealthy = () => {
-    setFailures({
-      power_west: false,
-      power_east: false,
-      fibre: false,
-      tower_A: false,
-      tower_B: false,
-      fm_tx: false,
-      gateway: false
-    });
+    setFailures(applyHealthyPreset());
+    setInterventions(createEmptyInterventions());
+    setAppliedPlanToast(null);
   };
 
   // Preset: Cyclone Hits (Compound Failure)
   const handlePresetCyclone = () => {
-    setFailures({
-      power_west: true,
-      power_east: true,
-      fibre: true,
-      tower_A: false,
-      tower_B: false,
-      fm_tx: false,
-      gateway: false
-    });
+    setFailures(applyCyclonePreset());
   };
 
-  // Preset: Gateway Lost (Dedicated demo beat: Cyclone + Gateway Cut)
+  // Preset: Gateway Lost (Dedicated demo beat: Cyclone + Gateway Cut - deterministic)
   const handlePresetGatewayLost = () => {
-    if (!failures.gateway) {
-      setFailures({
-        power_west: true,
-        power_east: true,
-        fibre: true,
-        tower_A: false,
-        tower_B: false,
-        fm_tx: false,
-        gateway: true
-      });
-    } else {
-      setFailures({
-        power_west: true,
-        power_east: true,
-        fibre: true,
-        tower_A: false,
-        tower_B: false,
-        fm_tx: false,
-        gateway: false
-      });
-    }
+    setFailures(applyGatewayLostPreset());
   };
 
-  // Active failure count
+  // Active failure count & exact scenario identification
   const activeFailureCount = Object.values(failures).filter(Boolean).length;
   const isHealthyPreset = activeFailureCount === 0;
-  const isCyclonePreset = failures.power_west && failures.power_east && failures.fibre && !failures.gateway;
-  const isGatewayLostPreset = failures.power_west && failures.power_east && failures.fibre && failures.gateway;
+  const isCyclonePreset = failures.power_west && failures.power_east && failures.fibre && !failures.tower_A && !failures.tower_B && !failures.fm_tx && !failures.gateway;
+  const isGatewayLostPreset = failures.power_west && failures.power_east && failures.fibre && !failures.tower_A && !failures.tower_B && !failures.fm_tx && failures.gateway;
 
   // Run S30 alert-window simulation
   const s30Result = useMemo(() => {
@@ -973,8 +929,12 @@ export default function App() {
             ) : (
               <OutagePlanMatrix
                 config={config}
-                onSelectPlan={(planInterventions) => {
+                onSelectPlan={(planInterventions, planName) => {
                   setInterventions(planInterventions);
+                  setAppliedPlanToast({
+                    message: `${planName || 'Outage Restoration Plan'} applied to active simulation. Interventions deployed.`,
+                    type: 'success'
+                  });
                   setActiveTab('overview');
                 }}
               />

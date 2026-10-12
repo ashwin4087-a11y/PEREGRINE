@@ -108,6 +108,7 @@ export default function App() {
   // Preset: Healthy Grid
   const handlePresetHealthy = () => {
     setFailures(applyHealthyPreset());
+    setInterventions(createEmptyInterventions());
     setScenarioFeedback({
       message: 'Scenario activated: Healthy Grid — All infrastructure restored to baseline operational state.',
       type: 'success'
@@ -123,21 +124,13 @@ export default function App() {
     });
   };
 
-  // Preset: Gateway Lost (Dedicated demo beat: Cyclone + Gateway Cut)
+  // Preset: Gateway Lost (Dedicated demo beat: Cyclone + Gateway Cut - deterministic)
   const handlePresetGatewayLost = () => {
-    if (!failures.gateway) {
-      setFailures(applyGatewayLostPreset());
-      setScenarioFeedback({
-        message: 'Scenario activated: Gateway Loss — Marina satellite gateway severed; mesh alert reach drops to 0.0%.',
-        type: 'error'
-      });
-    } else {
-      setFailures(applyCyclonePreset());
-      setScenarioFeedback({
-        message: 'Marina Gateway restored — Returned to Cyclone Landfall baseline.',
-        type: 'info'
-      });
-    }
+    setFailures(applyGatewayLostPreset());
+    setScenarioFeedback({
+      message: 'Scenario activated: Gateway Loss — Marina satellite gateway severed; mesh alert reach drops to 0.0%.',
+      type: 'error'
+    });
   };
 
   const handleResetDefaults = () => {

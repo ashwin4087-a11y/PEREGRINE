@@ -50,6 +50,38 @@ export function createDefaultFailures(): NetworkFailureState {
   };
 }
 
+/**
+ * 1. Healthy Network Baseline: Clears all failures to pristine state.
+ */
+export function applyHealthyPreset(): NetworkFailureState {
+  return createDefaultFailures();
+}
+
+/**
+ * 2. Cyclone Landfall: Power West, Power East, and Core Fibre severed.
+ */
+export function applyCyclonePreset(): NetworkFailureState {
+  return {
+    ...createDefaultFailures(),
+    power_west: true,
+    power_east: true,
+    fibre: true
+  };
+}
+
+/**
+ * 3. Gateway Loss: Cyclone landfall plus loss of primary satellite gateway at Marina.
+ */
+export function applyGatewayLostPreset(): NetworkFailureState {
+  return {
+    ...createDefaultFailures(),
+    power_west: true,
+    power_east: true,
+    fibre: true,
+    gateway: true
+  };
+}
+
 export interface ActiveInterventions {
   backup_generation: boolean;
   mobile_broadcast_unit: boolean;
