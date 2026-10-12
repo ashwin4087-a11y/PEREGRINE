@@ -70,33 +70,74 @@ peregrine/
 
 ---
 
-## 3. Installation & Development
+## 3. Installation, Execution & Development
 
 ### Prerequisites
 - Node.js >= 20.x or Bun >= 1.2
 - npm, pnpm, or bun
 
 ### Commands
+
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies across root, frontend, and backend
 npm install
+npm install --prefix backend
+npm install --prefix frontend
+
+# 2. Run Full-Stack Architecture Concurrently (Backend :3001 + Frontend :3000)
+npm run dev:all
 # or
-bun install
+node scripts/dev.js
 
-# 2. Run local development server (port 3000)
-npm run dev
+# 3. Alternatively, run services independently:
+npm run dev:backend     # Express API server at http://localhost:3001
+npm run dev:frontend    # Vite React application at http://localhost:3000
 
-# 3. Execute automated test suite (all 45 tests)
-npm test
+# 4. Execute Complete Verification Test Suites (All 573 Automated Assertions)
+npm run test:all
 
-# 4. Run type checker / linter
-npm run lint
+# Or run individual test suites:
+npm test                # Root Model Integrity Test (115 assertions)
+npm run test:backend    # Backend Engine & HTTP API Tests (66 assertions)
+npm run test:frontend   # Frontend Model & API Fallback Tests (338 assertions)
+npm run test:fullstack  # Full-Stack Integration Acceptance Test (54 assertions)
 
-# 5. Build production bundle
-npm run build
+# 5. Type Checking & Production Builds
+npm run lint            # TypeScript compilation check
+npm run build           # Root production build
+npm run build:backend   # Compile backend TypeScript
+npm run build:frontend  # Compile frontend production bundle
 ```
 
+### Backend REST API Endpoints (`http://localhost:3001/api`)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Health check, server uptime, and memory usage |
+| `GET` | `/api/scenarios` | Canonical disaster scenario definitions (Healthy, Cyclone, Gateway Loss) |
+| `GET` | `/api/scenarios/components` | Critical infrastructure failure inventory (7 nodes) |
+| `GET` | `/api/scenarios/config` | Baseline parameters, settlement populations, and coordinates |
+| `GET` | `/api/scenarios/:id` | Specific scenario preset by identifier |
+| `POST` | `/api/simulations/run` | Execute S30 and S72 simulation over arbitrary failure states |
+| `POST` | `/api/redundancy/analyze` | Dependency graph audit, N-1 resilience, and Common-Cause failure cuts |
+| `POST` | `/api/planner/recommend` | Algorithmic recovery optimization (Plan A ReachMax vs Plan B FairnessFloor) |
+| `POST` | `/api/experiments/run` | Seeded Mulberry32 experiment generation, FNV-1a checksums, and sensitivity trials |
+
+*Note: If the backend API server is offline or unreachable, the frontend automatically and transparently switches to its local deterministic engine without interrupting the user experience.*
+
 ---
+
+## 3.1 Five Primary Navigation Destinations
+
+1. **Overview & Topology**: Real-time coastal broadcast infrastructure status, interactive cut-path toggles, instant S30 population reach, and settlement warning triage across 8 communities.
+2. **Silence Clock**: Human impact metric tracking cumulative blackout hours ($S_{72}$) over the 72-hour window, distinguishing 48h coastal grid outages from 72h permanent silence in isolated settlements (Thoni & Hill Camp).
+3. **Failure Analysis**: Comprehensive failure diagnosis workspace integrating:
+   - *Dependency Graph & Redundancy Illusion*: Reveals why 3 nominal channels collapse to $N-1 = 1$ under East Power common-cause cuts.
+   - *Stress Baselines & Experiments*: Reproducible parameter sensitivity benchmarking with Mulberry32 PRNG and FNV-1a checksums.
+4. **Recovery Planner**: Dual-objective emergency intervention planner integrating:
+   - *Decision Engine*: Compares aggregate reach maximization against community fairness floors, reporting honest shortfalls.
+   - *72h Outage Restoration Matrix*: 12-cell benchmark across budget tiers (20, 50, 80, 100 units) and auto-tune curves (0.0, 0.5, 1.0).
+5. **Alert Integrity**: End-to-end cryptographic console utilizing standard W3C WebCrypto (ECDSA P-256 + SHA-256) for alert signing, tamper detection, withdrawal certificate chaining, and acoustic siren alarm validation.
 
 ## 4. Simulation Methodology & Mathematical Formulations
 

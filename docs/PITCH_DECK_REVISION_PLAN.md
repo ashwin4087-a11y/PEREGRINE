@@ -133,7 +133,7 @@ All deck titles and slide footers must use the authentic PEREGRINE falcon vector
 | **Trade-off Summary** | High headline score; small villages completely abandoned | -6.8% aggregate reach penalty to eliminate total silence |
 
 ### Key Takeaway for Judges
-> *"Average-maximising algorithms systematically discriminate against small, isolated communities because their population is too small to justify capital allocation. PEREGRINE proves that protecting Thoni and Hill Camp requires an explicit algorithmic fairness constraint, accepting a 6.8 percentage point trade-off in the regional average."*
+> *"Under these assumptions the model shows that unconstrained average-maximising algorithms leave small, isolated communities behind because their population is too small to justify capital allocation under purely aggregate metrics. Protecting Thoni and Hill Camp requires an explicit algorithmic fairness constraint, accepting a 6.8 percentage point trade-off in the regional average."*
 
 ### Convergence Note
 *At higher budgets (80u and 100u), both strategies converge on deploying Generators, Mobile Units, and Sirens (70u total), achieving 35.6% overall reach with the lowest village reaching 34.4%.*
