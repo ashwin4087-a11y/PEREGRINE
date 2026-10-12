@@ -11,7 +11,10 @@ import {
   compareRecoveryStrategies, 
   PlannerScenarioMode,
   CandidateIntervention,
-  candidatesToActiveInterventions
+  candidatesToActiveInterventions,
+  AppliedPlanInfo,
+  areFailuresEqual,
+  areInterventionsEqual
 } from '../planner/engine';
 import { 
   Scale, 
@@ -24,21 +27,37 @@ import {
   Info, 
   Clock, 
   Sparkles,
-  Zap
+  Zap,
+  RotateCcw,
+  Compass
 } from 'lucide-react';
 
 interface DecisionEngineViewProps {
   config: SystemConfig;
   failures: NetworkFailureState;
+  interventions?: ActiveInterventions;
+  activeInterventions?: ActiveInterventions;
+  appliedPlan?: AppliedPlanInfo | null;
   autoTune?: number;
-  onApplyPlan?: (interventions: ActiveInterventions, planName: string) => void;
+  onApplyPlan?: (
+    interventions: ActiveInterventions,
+    planName: string,
+    planMeta?: AppliedPlanInfo
+  ) => void;
+  onResetInterventions?: () => void;
+  onNavigateToMap?: () => void;
 }
 
 export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
   config,
   failures,
+  interventions,
+  activeInterventions = interventions,
+  appliedPlan,
   autoTune = 0.5,
-  onApplyPlan
+  onApplyPlan,
+  onResetInterventions,
+  onNavigateToMap
 }) => {
   const [budget, setBudget] = useState<number>(50);
   const [fairnessFloor, setFairnessFloor] = useState<number>(0.35); // 35% reach floor
@@ -64,6 +83,74 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
       autoTune
     );
   }, [config, failures, budget, fairnessFloor, scenarioMode, autoTune]);
+
+  // Check if Plan A or Plan B matches currently applied interventions
+  const isPlanAApplied = useMemo(() => {
+    if (!appliedPlan || appliedPlan.planId !== 'plan_a') return false;
+    const planAInterventions = candidatesToActiveInterventions(planReach.chosenInterventions);
+    return areInterventionsEqual(appliedPlan.interventions, planAInterventions);
+  }, [appliedPlan, planReach.chosenInterventions]);
+
+  const isPlanBApplied = useMemo(() => {
+    if (!appliedPlan || appliedPlan.planId !== 'plan_b') return false;
+    const planBInterventions = candidatesToActiveInterventions(planFairness.chosenInterventions);
+    return areInterventionsEqual(appliedPlan.interventions, planBInterventions);
+  }, [appliedPlan, planFairness.chosenInterventions]);
+
+  // Check if the currently applied plan is stale relative to current inputs or failures
+  const isAppliedPlanStale = useMemo(() => {
+    if (!appliedPlan) return false;
+    if (!areFailuresEqual(appliedPlan.scenarioSnapshot, failures)) return true;
+    if (appliedPlan.planId === 'plan_a' && (appliedPlan.budget !== budget || appliedPlan.scenarioMode !== scenarioMode)) return true;
+    if (appliedPlan.planId === 'plan_b' && (appliedPlan.budget !== budget || appliedPlan.scenarioMode !== scenarioMode)) return true;
+    return false;
+  }, [appliedPlan, failures, budget, scenarioMode]);
+
+  const handleApplyPlanA = () => {
+    const planAInterventions = candidatesToActiveInterventions(planReach.chosenInterventions);
+    const meta: AppliedPlanInfo = {
+      planId: 'plan_a',
+      planName: 'Plan A: Reach Maximiser',
+      strategy: 'reach_max',
+      appliedAt: new Date().toLocaleTimeString(),
+      appliedTimestamp: Date.now(),
+      budget,
+      totalCost: planReach.totalCost,
+      chosenInterventions: planReach.chosenInterventions,
+      interventions: planAInterventions,
+      scenarioMode,
+      scenarioSnapshot: { ...failures },
+      reachBefore: planReach.overallReachBefore,
+      reachAfter: planReach.overallReachAfter,
+      minVillageReachAfter: planReach.minVillageReachAfter,
+      floorMet: planReach.floorMet,
+      gainPts: Number((planReach.overallReachAfter - planReach.overallReachBefore).toFixed(1))
+    };
+    onApplyPlan?.(planAInterventions, 'Plan A: Reach Maximiser', meta);
+  };
+
+  const handleApplyPlanB = () => {
+    const planBInterventions = candidatesToActiveInterventions(planFairness.chosenInterventions);
+    const meta: AppliedPlanInfo = {
+      planId: 'plan_b',
+      planName: 'Plan B: Fairness-Floor Optimizer',
+      strategy: 'fairness_floor',
+      appliedAt: new Date().toLocaleTimeString(),
+      appliedTimestamp: Date.now(),
+      budget,
+      totalCost: planFairness.totalCost,
+      chosenInterventions: planFairness.chosenInterventions,
+      interventions: planBInterventions,
+      scenarioMode,
+      scenarioSnapshot: { ...failures },
+      reachBefore: planFairness.overallReachBefore,
+      reachAfter: planFairness.overallReachAfter,
+      minVillageReachAfter: planFairness.minVillageReachAfter,
+      floorMet: planFairness.floorMet,
+      gainPts: Number((planFairness.overallReachAfter - planFairness.overallReachBefore).toFixed(1))
+    };
+    onApplyPlan?.(planBInterventions, 'Plan B: Fairness-Floor Optimizer', meta);
+  };
 
   return (
     <div className="space-y-6">
@@ -107,6 +194,57 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Applied Plan & Active Network Operations Banner */}
+      {appliedPlan && (
+        <div className={`p-4 rounded-lg border font-mono-numbers text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs ${
+          isAppliedPlanStale
+            ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+            : 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+        }`}>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`w-2.5 h-2.5 rounded-full ${isAppliedPlanStale ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+              <strong className="text-sm font-heading">{appliedPlan.planName}</strong>
+              <span className="stamp-label stamp-verified text-[0.6rem]">LIVE IN SIMULATION</span>
+              {isAppliedPlanStale && (
+                <span className="stamp-label stamp-critical text-[0.6rem]">INPUTS CHANGED · PENDING RECALCULATION</span>
+              )}
+            </div>
+            <p className="text-[0.72rem] text-slate-700 leading-relaxed">
+              Active configuration: {appliedPlan.chosenInterventions.length} interventions ({appliedPlan.totalCost}u of {appliedPlan.budget}u budget) deployed at {appliedPlan.appliedAt}.
+              {isAppliedPlanStale && ' Budget or outage failure state was modified since deployment. Click Apply to update the live network.'}
+            </p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {appliedPlan.chosenInterventions.map(c => (
+                <span key={c.id} className="text-[0.68rem] px-2 py-0.5 bg-white border border-slate-300 rounded font-semibold text-[var(--navy)]">
+                  {c.label} ({c.cost}u)
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onNavigateToMap && (
+              <button
+                onClick={onNavigateToMap}
+                className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-[var(--navy)] rounded text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <Compass className="w-3.5 h-3.5 text-sky-600" />
+                <span>View on GIS Map</span>
+              </button>
+            )}
+            {onResetInterventions && (
+              <button
+                onClick={onResetInterventions}
+                className="px-3 py-1.5 bg-white border border-red-200 hover:bg-red-50 text-red-700 rounded text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Interventions</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Control Bench: Budget, Floor & Active Failure Context */}
       <div className="utility-card p-5 sm:p-6 space-y-4 rounded-lg">
@@ -210,7 +348,14 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
                   Plan A: Reach Maximiser
                 </h3>
               </div>
-              <span className="stamp-label stamp-simulation text-[0.6rem]">AVERAGE-DRIVEN</span>
+              <div className="flex items-center gap-1.5">
+                {isPlanAApplied && (
+                  <span className={`stamp-label text-[0.6rem] ${isAppliedPlanStale ? 'stamp-critical' : 'stamp-verified'}`}>
+                    {isAppliedPlanStale ? 'STALE' : 'APPLIED'}
+                  </span>
+                )}
+                <span className="stamp-label stamp-simulation text-[0.6rem]">AVERAGE-DRIVEN</span>
+              </div>
             </div>
 
             <p className="text-xs text-[var(--muted)] my-3 leading-relaxed">
@@ -274,11 +419,19 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
 
             {onApplyPlan && planReach.chosenInterventions.length > 0 && (
               <button
-                onClick={() => onApplyPlan(candidatesToActiveInterventions(planReach.chosenInterventions), 'Plan A: Reach Maximiser')}
-                className="mt-3 w-full py-2 px-3 bg-[var(--navy)] hover:bg-slate-800 text-white font-mono-numbers text-xs font-bold rounded flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                onClick={handleApplyPlanA}
+                className={`mt-3 w-full py-2 px-3 font-mono-numbers text-xs font-bold rounded flex items-center justify-center gap-1.5 transition-colors shadow-xs ${
+                  isPlanAApplied && !isAppliedPlanStale
+                    ? 'bg-blue-700 text-white hover:bg-blue-800 ring-2 ring-blue-400/40'
+                    : 'bg-[var(--navy)] hover:bg-slate-800 text-white'
+                }`}
               >
                 <Zap className="w-3.5 h-3.5 text-blue-400" />
-                <span>Apply Plan A to Network</span>
+                <span>
+                  {isPlanAApplied
+                    ? (isAppliedPlanStale ? 'Re-apply Plan A (Scenario Changed)' : 'Plan A Applied to Network (Re-apply)')
+                    : 'Apply Plan A to Network'}
+                </span>
               </button>
             )}
           </div>
@@ -294,7 +447,14 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
                   Plan B: Fairness-Floor Optimizer
                 </h3>
               </div>
-              <span className="stamp-label stamp-verified text-[0.6rem]">EQUITY-PROTECTED</span>
+              <div className="flex items-center gap-1.5">
+                {isPlanBApplied && (
+                  <span className={`stamp-label text-[0.6rem] ${isAppliedPlanStale ? 'stamp-critical' : 'stamp-verified'}`}>
+                    {isAppliedPlanStale ? 'STALE' : 'APPLIED'}
+                  </span>
+                )}
+                <span className="stamp-label stamp-verified text-[0.6rem]">EQUITY-PROTECTED</span>
+              </div>
             </div>
 
             <p className="text-xs text-[var(--muted)] my-3 leading-relaxed">
@@ -358,11 +518,19 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
 
             {onApplyPlan && planFairness.chosenInterventions.length > 0 && (
               <button
-                onClick={() => onApplyPlan(candidatesToActiveInterventions(planFairness.chosenInterventions), 'Plan B: Fairness-Floor Optimizer')}
-                className="mt-3 w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-mono-numbers text-xs font-bold rounded flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                onClick={handleApplyPlanB}
+                className={`mt-3 w-full py-2 px-3 font-mono-numbers text-xs font-bold rounded flex items-center justify-center gap-1.5 transition-colors shadow-xs ${
+                  isPlanBApplied && !isAppliedPlanStale
+                    ? 'bg-emerald-700 text-white hover:bg-emerald-800 ring-2 ring-emerald-400/40'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
-                <span>Apply Plan B to Network</span>
+                <span>
+                  {isPlanBApplied
+                    ? (isAppliedPlanStale ? 'Re-apply Plan B (Scenario Changed)' : 'Plan B Applied to Network (Re-apply)')
+                    : 'Apply Plan B to Network'}
+                </span>
               </button>
             )}
           </div>

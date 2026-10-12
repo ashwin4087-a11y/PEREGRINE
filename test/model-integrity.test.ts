@@ -31,7 +31,14 @@ import {
   calculateRedundancyIllusion, 
   NetworkFailureState 
 } from '../src/model/graph';
-import { runPlanner, compareRecoveryStrategies } from '../src/planner/engine';
+import { 
+  runPlanner, 
+  compareRecoveryStrategies, 
+  candidatesToActiveInterventions, 
+  areFailuresEqual, 
+  areInterventionsEqual, 
+  AppliedPlanInfo 
+} from '../src/planner/engine';
 import { generateReproducibleExperiment } from '../src/integrity/experiment';
 
 let passCount = 0;
@@ -457,6 +464,99 @@ const karaiRestored = illusionRestored.find(v => v.villageId === 'karai');
 assert(karaiRestored?.n1Guaranteed === 1, 'Healthy restoration restores Karai N-1 guaranteed to 1');
 
 // -----------------------------------------------------------------------------
+// Test 19: Recovery Plan Application to Live Map & Canonical Simulation State
+// -----------------------------------------------------------------------------
+console.log('\n--- Test 19: Recovery Plan Application to Live Map & Canonical Simulation State ---');
+
+const cycloneFailureState = applyCyclonePreset();
+const planComparison = compareRecoveryStrategies(INITIAL_CONFIG, cycloneFailureState, 50, 0.35, 'S72', 0.5);
+
+// 1. Plan A (Reach Maximiser) Application & Canonical State
+const planAInterventions = candidatesToActiveInterventions(planComparison.planReach.chosenInterventions);
+assert(planAInterventions.backup_generation === true, 'Plan A applies Backup Diesel Generator (20u)');
+assert(planAInterventions.mobile_broadcast_unit === true, 'Plan A applies Mobile Broadcast Unit (30u)');
+assert(planAInterventions.siren_responders.length === 0, 'Plan A does not allocate siren patrols to isolated villages');
+assert(planComparison.planReach.totalCost === 50, 'Plan A consumes full 50u budget (20u gen + 30u mobile unit)');
+
+// Fresh simulation under Plan A interventions
+const s72PlanARun = simulateS72(INITIAL_CONFIG, planAInterventions, 0.5, cycloneFailureState);
+assertClose(s72PlanARun.overallReach, planComparison.planReach.overallReachAfter, 0.2, 'Plan A canonical S72 simulation matches planner reported overall reach (~31.8%)');
+const s30PlanARun = simulateS30(INITIAL_CONFIG, cycloneFailureState, planAInterventions, 0.5);
+assert(s30PlanARun.resilienceScore > s30CycloneRun.resilienceScore, 'Plan A recomputes S30 alert reach above unassisted cyclone baseline');
+
+// 2. Plan B (Fairness-Floor Optimizer) Application & Canonical State
+const planBInterventions = candidatesToActiveInterventions(planComparison.planFairness.chosenInterventions);
+assert(planBInterventions.backup_generation === true, 'Plan B applies Backup Diesel Generator (20u)');
+assert(planBInterventions.siren_responders.includes('thoni'), 'Plan B applies Siren Patrol to Thoni (10u)');
+assert(planBInterventions.siren_responders.includes('hillcamp'), 'Plan B applies Siren Patrol to Hill Camp (10u)');
+assert(planBInterventions.mobile_broadcast_unit === false, 'Plan B skips mobile broadcast unit to protect community floor');
+assert(planComparison.planFairness.totalCost === 40, 'Plan B consumes 40u budget (20u gen + 2x 10u sirens)');
+
+// Fresh simulation under Plan B interventions
+const s72PlanBRun = simulateS72(INITIAL_CONFIG, planBInterventions, 0.5, cycloneFailureState);
+assertClose(s72PlanBRun.overallReach, planComparison.planFairness.overallReachAfter, 0.5, 'Plan B canonical S72 simulation matches planner reported reach (~25.0%)');
+const thoniS72 = s72PlanBRun.villages.find(v => v.id === 'thoni');
+const hillCampS72 = s72PlanBRun.villages.find(v => v.id === 'hillcamp');
+assert(thoniS72?.silenceHours === 0, 'Plan B siren patrol eliminates all 72 silence hours for Thoni (0h)');
+assert(hillCampS72?.silenceHours === 0, 'Plan B siren patrol eliminates all 72 silence hours for Hill Camp (0h)');
+assertClose(s72PlanBRun.minVillageReach.value, planComparison.planFairness.minVillageReachAfter.value, 0.5, 'Plan B canonical simulation protects lowest village floor');
+
+// 3. Siren Patrol Modality Separation (Acoustic Alert ONLY — No False RF Claim)
+const s30PlanBRun = simulateS30(INITIAL_CONFIG, cycloneFailureState, planBInterventions, 0.5);
+const thoniS30 = s30PlanBRun.villageMetrics.find(v => v.id === 'thoni');
+assert(thoniS30?.activeChannels.includes('cell') === false, 'Siren patrol does NOT falsely claim cellular reception for Thoni');
+assert(thoniS30?.activeChannels.includes('fm') === false, 'Siren patrol does NOT falsely claim FM broadcast reception for Thoni');
+assertClose(thoniS30?.effectiveReach || 0, INITIAL_CONFIG.channels.siren.reachS30, 0.05, 'Thoni reach is strictly evaluated from siren acoustic model');
+
+// 4. Physical GIS Intervention Anchors & Coordinates
+const geoGen = { lat: 12.698, lng: 80.222 };
+const geoMobile = { lat: 12.748, lng: 80.238 };
+const geoSecondGw = { lat: 12.808, lng: 80.228 };
+assert(geoGen.lat > 12.6 && geoGen.lng > 80.2, 'Backup Generator has valid physical coordinate in South feeder corridor');
+assert(geoMobile.lat > 12.7 && geoMobile.lng > 80.2, 'Mobile Broadcast Unit has valid physical coordinate at Marina hub');
+assert(geoSecondGw.lat > 12.7 && geoSecondGw.lng > 80.2, 'Secondary Gateway has valid physical coordinate at Pazhaya');
+
+// 5. Staleness Detection & Invalidation Across Scenario Changes
+const appliedPlanInfo: AppliedPlanInfo = {
+  planId: 'plan_a',
+  planName: 'Plan A: Reach Maximiser',
+  strategy: 'reach_max',
+  appliedAt: '12:00:00',
+  appliedTimestamp: Date.now(),
+  budget: 50,
+  totalCost: planComparison.planReach.totalCost,
+  chosenInterventions: planComparison.planReach.chosenInterventions,
+  interventions: planAInterventions,
+  scenarioMode: 'S72',
+  scenarioSnapshot: { ...cycloneFailureState },
+  reachBefore: planComparison.planReach.overallReachBefore,
+  reachAfter: planComparison.planReach.overallReachAfter,
+  minVillageReachAfter: planComparison.planReach.minVillageReachAfter,
+  floorMet: planComparison.planReach.floorMet,
+  gainPts: 12.3
+};
+
+assert(areFailuresEqual(appliedPlanInfo.scenarioSnapshot, cycloneFailureState) === true, 'Applied plan snapshot matches current scenario when unchanged');
+assert(areFailuresEqual(appliedPlanInfo.scenarioSnapshot, gatewayLostPreset1) === false, 'Stale plan detected: Changing to Gateway Lost invalidates snapshot');
+assert(areInterventionsEqual(appliedPlanInfo.interventions, planAInterventions) === true, 'Applied interventions equality helper matches current active interventions');
+assert(areInterventionsEqual(appliedPlanInfo.interventions, planBInterventions) === false, 'Interventions equality helper correctly distinguishes Plan A from Plan B');
+
+// 6. Idempotency & Duplicate Prevention
+const candidateDuplicated = [...planComparison.planFairness.chosenInterventions, ...planComparison.planFairness.chosenInterventions];
+const deduplicatedInterventions = candidatesToActiveInterventions(candidateDuplicated);
+assert(deduplicatedInterventions.siren_responders.length === 2, 'candidatesToActiveInterventions strictly deduplicates target village siren assignments');
+assert(deduplicatedInterventions.siren_responders.filter(id => id === 'thoni').length === 1, 'Thoni appears exactly once in siren responders despite repeated clicks');
+
+// 7. Clean Reset Semantics
+const resetInterventions = createEmptyInterventions();
+assert(resetInterventions.backup_generation === false, 'Reset clears generator');
+assert(resetInterventions.mobile_broadcast_unit === false, 'Reset clears mobile broadcast unit');
+assert(resetInterventions.second_gateway === false, 'Reset clears second gateway');
+assert(resetInterventions.siren_responders.length === 0, 'Reset clears all siren patrols');
+assert(resetInterventions.community_kits.length === 0, 'Reset clears all community kits');
+assert(resetInterventions.relay_nodes.length === 0, 'Reset clears all relay nodes');
+
+// -----------------------------------------------------------------------------
 // Final Summary
 // -----------------------------------------------------------------------------
 console.log('\n======================================================');
@@ -468,3 +568,4 @@ if (failCount > 0) {
 } else {
   process.exit(0);
 }
+

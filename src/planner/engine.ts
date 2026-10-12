@@ -75,6 +75,51 @@ export interface PlanComparisonResult {
   insightReport: string;
 }
 
+export interface AppliedPlanInfo {
+  planId: 'plan_a' | 'plan_b' | 'outage_matrix' | 'manual';
+  planName: string;
+  strategy: 'reach_max' | 'fairness_floor' | 'outage_restoration' | 'manual';
+  appliedAt: string;
+  appliedTimestamp: number;
+  budget: number;
+  totalCost: number;
+  chosenInterventions: CandidateIntervention[];
+  interventions: ActiveInterventions;
+  scenarioMode: PlannerScenarioMode;
+  scenarioSnapshot: NetworkFailureState;
+  reachBefore: number;
+  reachAfter: number;
+  minVillageReachAfter: { id: string; name: string; value: number };
+  floorMet: boolean;
+  gainPts: number;
+}
+
+export function areFailuresEqual(a: NetworkFailureState, b: NetworkFailureState): boolean {
+  return (
+    a.power_west === b.power_west &&
+    a.power_east === b.power_east &&
+    a.fibre === b.fibre &&
+    a.tower_A === b.tower_A &&
+    a.tower_B === b.tower_B &&
+    a.fm_tx === b.fm_tx &&
+    a.gateway === b.gateway
+  );
+}
+
+export function areInterventionsEqual(a: ActiveInterventions, b: ActiveInterventions): boolean {
+  if (a.backup_generation !== b.backup_generation) return false;
+  if (a.mobile_broadcast_unit !== b.mobile_broadcast_unit) return false;
+  if (a.second_gateway !== b.second_gateway) return false;
+  if (a.relay_nodes.length !== b.relay_nodes.length) return false;
+  if (a.siren_responders.length !== b.siren_responders.length) return false;
+  if (a.community_kits.length !== b.community_kits.length) return false;
+  return (
+    a.relay_nodes.every(id => b.relay_nodes.includes(id)) &&
+    a.siren_responders.every(id => b.siren_responders.includes(id)) &&
+    a.community_kits.every(id => b.community_kits.includes(id))
+  );
+}
+
 /**
  * Generates available candidate interventions derived directly from centralised configuration.
  */

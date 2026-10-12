@@ -35,6 +35,8 @@ import {
   Globe2
 } from 'lucide-react';
 
+import { AppliedPlanInfo } from '../planner/engine';
+
 interface NetworkMapAndGraphProps {
   villages: VillageConfig[];
   failures: NetworkFailureState;
@@ -42,6 +44,8 @@ interface NetworkMapAndGraphProps {
   onToggleFailure: (key: keyof NetworkFailureState) => void;
   selectedVillageId?: string | null;
   onSelectVillage?: (id: string) => void;
+  appliedPlan?: AppliedPlanInfo | null;
+  onResetInterventions?: () => void;
 }
 
 // Map base layer types
@@ -130,13 +134,16 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
   interventions,
   onToggleFailure,
   selectedVillageId,
-  onSelectVillage
+  onSelectVillage,
+  appliedPlan,
+  onResetInterventions
 }) => {
   // Layer visibility toggles
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('satellite');
   const [showRFRadius, setShowRFRadius] = useState<boolean>(true);
   const [showPowerGrid, setShowPowerGrid] = useState<boolean>(true);
   const [showMeshHops, setShowMeshHops] = useState<boolean>(true);
+  const [showInterventions, setShowInterventions] = useState<boolean>(true);
   const [tileErrorCount, setTileErrorCount] = useState<number>(0);
   const [isTileLoading, setIsTileLoading] = useState<boolean>(false);
   const [selectedSiteKey, setSelectedSiteKey] = useState<string | null>(null);
@@ -145,6 +152,15 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const overlayGroupRef = useRef<L.LayerGroup | null>(null);
+
+  // Active interventions count
+  const activeInterventionsCount = 
+    (interventions.backup_generation ? 1 : 0) +
+    (interventions.mobile_broadcast_unit ? 1 : 0) +
+    (interventions.second_gateway ? 1 : 0) +
+    (interventions.siren_responders?.length || 0) +
+    (interventions.community_kits?.length || 0) +
+    (interventions.relay_nodes?.length || 0);
 
   // Compute live mesh topology using the official graph engine
   const meshTopology: MeshTopology = computeMeshTopology(
@@ -156,7 +172,7 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
   // Derive operational status of core infrastructure
   const isTowerAOnAir = !failures.tower_A && !failures.power_west && !failures.fibre;
   const isTowerBOnAir = !failures.tower_B && (!failures.power_east || interventions.backup_generation) && !failures.fibre;
-  const isFmOnAir = !failures.fm_tx && (!failures.power_east || interventions.backup_generation);
+  const isFmOnAir = (!failures.fm_tx && (!failures.power_east || interventions.backup_generation)) || Boolean(interventions.mobile_broadcast_unit);
   const isGatewayFeeding = !failures.gateway || interventions.second_gateway;
 
   // Selected village info
@@ -451,7 +467,151 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
     satMarker.bindTooltip(`<b>Primary Sat Gateway (Marina)</b><br/>Status: ${failures.gateway ? (interventions.second_gateway ? 'BACKUP GATEWAY ACTIVE' : 'FEED LOST [ISOLATED]') : 'C-BAND UPLINK ACTIVE'}<br/><i>Click to toggle gateway outage</i>`, { direction: 'top' });
     satMarker.on('click', () => onToggleFailure('gateway'));
 
-    // 5. Human Settlement Footprints & Warning Reception Markers
+    // 5. Applied Interventions Physical Layers (Generators, Mobile FM, Sirens, 2nd Gateway)
+    if (showInterventions) {
+      // Helper to generate distinct intervention icons
+      const createInterventionIcon = (iconText: string, borderColor: string, bgColor: string = '#0F2B48') => {
+        return L.divIcon({
+          className: 'custom-intervention-marker',
+          html: `
+            <div style="
+              background: ${bgColor}; 
+              border: 2px solid ${borderColor}; 
+              border-radius: 50%; 
+              width: 30px; 
+              height: 30px; 
+              display: flex; 
+              align-items: center; 
+              justify-content: center;
+              box-shadow: 0 0 10px ${borderColor}88, 0 2px 6px rgba(0,0,0,0.8);
+              cursor: pointer;
+            ">
+              <span style="font-size: 13px;">${iconText}</span>
+            </div>
+          `,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+      };
+
+      // A. Backup Diesel Generator (20u)
+      if (interventions.backup_generation) {
+        const genMarker = L.marker([12.698, 80.222], {
+          icon: createInterventionIcon('⚡🔋', '#10B981', '#064E3B')
+        }).addTo(overlayGroup);
+        genMarker.bindTooltip(
+          '<b>Applied Intervention: Backup Diesel Generator (20u)</b><br/>' +
+          'Stationed: Substation East / Tower B Corridor [12.698°N, 80.222°E]<br/>' +
+          'Restores: Feeder E2 (230kV) to Tower B Cell &amp; FM Transmitter<br/>' +
+          'Fuel Autonomy: Active 72h Continuous Fuel Buffer',
+          { direction: 'top' }
+        );
+      }
+
+      // B. Mobile FM Broadcast Unit (30u)
+      if (interventions.mobile_broadcast_unit) {
+        // Mobile FM coverage circle (8.5km radius)
+        L.circle([12.748, 80.238], {
+          radius: 8500,
+          color: '#0284C7',
+          fillColor: '#38BDF8',
+          fillOpacity: 0.14,
+          weight: 2,
+          dashArray: '5, 5'
+        }).bindTooltip('Mobile Broadcast Unit FM Footprint (8.5km Emergency Corridor)', { direction: 'center' })
+          .addTo(overlayGroup);
+
+        const mobileMarker = L.marker([12.748, 80.238], {
+          icon: createInterventionIcon('🚚📻', '#38BDF8', '#0C4A6E')
+        }).addTo(overlayGroup);
+        mobileMarker.bindTooltip(
+          '<b>Applied Intervention: Mobile Broadcast Unit (30u)</b><br/>' +
+          'Location: Marina Operations Hub [12.748°N, 80.238°E]<br/>' +
+          'Transmitter: 5kW Truck-Mounted Mobile Emergency FM Transmitter<br/>' +
+          'Restores: Direct FM Warning reception across coastal settlements',
+          { direction: 'top' }
+        );
+      }
+
+      // C. Secondary Satellite Gateway (40u)
+      if (interventions.second_gateway) {
+        const secGwMarker = L.marker([12.808, 80.228], {
+          icon: createInterventionIcon('🛰', '#F59E0B', '#78350F')
+        }).addTo(overlayGroup);
+        secGwMarker.bindTooltip(
+          '<b>Applied Intervention: Secondary Satellite Gateway (40u)</b><br/>' +
+          'Location: Pazhaya Inland Teleport [12.808°N, 80.228°E]<br/>' +
+          'Uplink: Independent Ku-Band Satellite Feed<br/>' +
+          'Restores: Feeds mesh network even when Marina gateway is severed',
+          { direction: 'top' }
+        );
+      }
+
+      // D. Siren Patrol Responders (10u each)
+      (interventions.siren_responders || []).forEach(vid => {
+        const targetV = villages.find(v => v.id === vid);
+        if (!targetV || !targetV.lat || !targetV.lng) return;
+
+        // Acoustic Audible Alert Zone (1.2km radius)
+        L.circle([targetV.lat, targetV.lng], {
+          radius: 1200,
+          color: '#F59E0B',
+          fillColor: '#F59E0B',
+          fillOpacity: 0.18,
+          weight: 2,
+          dashArray: '3, 6'
+        }).bindTooltip(
+          `<b>${targetV.name} Siren Patrol Zone</b><br/>130dB Acoustic Horn Footprint (1.2km radius)`,
+          { direction: 'center' }
+        ).addTo(overlayGroup);
+
+        // Vehicle Responder Marker
+        const sirenMarker = L.marker([targetV.lat, targetV.lng], {
+          icon: createInterventionIcon('📢', '#F59E0B', '#451A03')
+        }).addTo(overlayGroup);
+        sirenMarker.bindTooltip(
+          `<b>Applied Intervention: Siren Patrol Responder (10u)</b><br/>` +
+          `Stationed: ${targetV.name} (${targetV.pop.toLocaleString()} residents)<br/>` +
+          `Alert Method: High-Output Vehicle Siren Horn<br/>` +
+          `<b>Note: Provides acoustic outdoor alert ONLY — does NOT restore Cell/FM RF signal.</b>`,
+          { direction: 'top' }
+        );
+      });
+
+      // E. Community Satellite Kits (15u each)
+      (interventions.community_kits || []).forEach(vid => {
+        const targetV = villages.find(v => v.id === vid);
+        if (!targetV || !targetV.lat || !targetV.lng) return;
+
+        const kitMarker = L.marker([targetV.lat, targetV.lng], {
+          icon: createInterventionIcon('📦', '#10B981', '#064E3B')
+        }).addTo(overlayGroup);
+        kitMarker.bindTooltip(
+          `<b>Applied Intervention: Community Satellite Kit (15u)</b><br/>` +
+          `Stationed: ${targetV.name} Community Center<br/>` +
+          `Equipped: Direct L-Band Satellite Receiver &amp; Local PA Audio`,
+          { direction: 'top' }
+        );
+      });
+
+      // F. Mesh Relay Extenders (10u each)
+      (interventions.relay_nodes || []).forEach(vid => {
+        const targetV = villages.find(v => v.id === vid);
+        if (!targetV || !targetV.lat || !targetV.lng) return;
+
+        const relayMarker = L.marker([targetV.lat, targetV.lng], {
+          icon: createInterventionIcon('📶', '#38BDF8', '#0C4A6E')
+        }).addTo(overlayGroup);
+        relayMarker.bindTooltip(
+          `<b>Applied Intervention: Extended Mesh Relay Node (10u)</b><br/>` +
+          `Deployed at: ${targetV.name}<br/>` +
+          `Expands local 868MHz packet forwarding`,
+          { direction: 'top' }
+        );
+      });
+    }
+
+    // 6. Human Settlement Footprints & Warning Reception Markers
     villages.forEach(v => {
       if (!v.lat || !v.lng) return;
 
@@ -464,28 +624,75 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
       );
       const hasFmCoverage = Boolean(v.fm && isFmOnAir);
       const hasMeshCoverage = Boolean(meshNode?.connectedToGateway && isGatewayFeeding);
-      const hasAnyWarning = hasCellCoverage || hasFmCoverage || hasMeshCoverage;
+      const hasSiren = Boolean(interventions.siren_responders?.includes(v.id));
+      const hasCommunityKit = Boolean(interventions.community_kits?.includes(v.id));
+
+      const hasBroadcastCoverage = hasCellCoverage || hasFmCoverage || hasMeshCoverage;
+      const hasAnyWarning = hasBroadcastCoverage || hasSiren || hasCommunityKit;
 
       // Settlement footprint radius proportional to population
       const footprintRadiusMeters = Math.min(1800, Math.max(900, Math.round(v.pop * 0.35)));
 
+      // Determine outline and fill colors reflecting real warning mechanism
+      const footprintColor = hasBroadcastCoverage 
+        ? '#38BDF8' 
+        : hasSiren 
+        ? '#F59E0B' 
+        : hasCommunityKit 
+        ? '#10B981' 
+        : '#EF4444';
+
+      const fillColor = hasBroadcastCoverage 
+        ? '#0284C7' 
+        : hasSiren 
+        ? '#D97706' 
+        : hasCommunityKit 
+        ? '#059669' 
+        : '#DC2626';
+
       // Ground footprint circle on satellite imagery
       L.circle([v.lat, v.lng], {
         radius: footprintRadiusMeters,
-        color: hasAnyWarning ? '#38BDF8' : '#EF4444',
-        fillColor: hasAnyWarning ? '#0284C7' : '#DC2626',
-        fillOpacity: isSelected ? 0.35 : 0.2,
+        color: footprintColor,
+        fillColor: fillColor,
+        fillOpacity: isSelected ? 0.38 : 0.22,
         weight: isSelected ? 2.5 : 1.5,
-        dashArray: hasAnyWarning ? undefined : '4, 4'
+        dashArray: hasBroadcastCoverage ? undefined : hasSiren || hasCommunityKit ? '3, 4' : '4, 4'
       }).addTo(overlayGroup);
 
       // Placard label icon
+      const villageStatusText = hasBroadcastCoverage 
+        ? 'ALERT OK (RF)' 
+        : hasSiren 
+        ? 'ALERT OK (SIREN 10u)' 
+        : hasCommunityKit 
+        ? 'ALERT OK (KIT 15u)' 
+        : 'BLACKOUT';
+
+      const statusBadgeColor = hasBroadcastCoverage 
+        ? '#86EFAC' 
+        : hasSiren 
+        ? '#FCD34D' 
+        : hasCommunityKit 
+        ? '#6EE7B7' 
+        : '#FFA1A1';
+
+      const placardBorder = isSelected 
+        ? '2px solid #F4B942' 
+        : hasBroadcastCoverage 
+        ? '1px solid rgba(56, 189, 248, 0.7)' 
+        : hasSiren 
+        ? '1.5px solid #F59E0B' 
+        : hasCommunityKit 
+        ? '1.5px solid #10B981' 
+        : '1.5px solid #EF4444';
+
       const villageIcon = L.divIcon({
         className: 'custom-village-placard',
         html: `
           <div style="
             background: #081D36; 
-            border: ${isSelected ? '2px solid #F4B942' : hasAnyWarning ? '1px solid rgba(56, 189, 248, 0.6)' : '1.5px solid #EF4444'}; 
+            border: ${placardBorder}; 
             border-radius: 3px; 
             padding: 3px 6px; 
             box-shadow: 0 2px 8px rgba(0,0,0,0.7);
@@ -496,20 +703,35 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
             <div style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: bold; font-size: 11px; color: #FFFFFF; line-height: 1.1;">
               ${v.name}
             </div>
-            <div style="font-family: 'Azeret Mono', monospace; font-size: 8px; color: ${hasAnyWarning ? '#86EFAC' : '#FFA1A1'};">
-              ${v.pop.toLocaleString()} pop · ${hasAnyWarning ? 'ALERT OK' : 'BLACKOUT'}
+            <div style="font-family: 'Azeret Mono', monospace; font-size: 8px; color: ${statusBadgeColor};">
+              ${v.pop.toLocaleString()} pop · ${villageStatusText}
             </div>
           </div>
         `,
-        iconSize: [80, 28],
-        iconAnchor: [40, 14]
+        iconSize: [85, 28],
+        iconAnchor: [42, 14]
       });
 
       const marker = L.marker([v.lat, v.lng], { icon: villageIcon }).addTo(overlayGroup);
       marker.on('click', () => {
         if (onSelectVillage) onSelectVillage(v.id);
       });
-      marker.bindTooltip(`<b>${v.name}</b> (${v.pop.toLocaleString()} residents)<br/>${v.description}<br/>Status: <b>${hasAnyWarning ? 'PROTECTED' : 'TOTAL BLACKOUT'}</b>`, { direction: 'top' });
+
+      const tooltipStatus = hasBroadcastCoverage
+        ? 'PROTECTED (BROADCAST RF)'
+        : hasSiren
+        ? 'PROTECTED VIA SIREN PATROL (10u Acoustic Warning — No Cell/FM RF)'
+        : hasCommunityKit
+        ? 'PROTECTED VIA COMMUNITY SAT KIT (15u)'
+        : 'TOTAL BLACKOUT (0 CHANNELS)';
+
+      marker.bindTooltip(
+        `<b>${v.name}</b> (${v.pop.toLocaleString()} residents)<br/>` +
+        `${v.description}<br/>` +
+        `Status: <b>${tooltipStatus}</b><br/>` +
+        `Channels: Cell=${hasCellCoverage ? 'ON' : 'OFF'}, FM=${hasFmCoverage ? 'ON' : 'OFF'}, Mesh=${hasMeshCoverage ? 'ON' : 'OFF'}, Siren=${hasSiren ? 'ACTIVE' : 'NO'}`,
+        { direction: 'top' }
+      );
     });
 
   }, [
@@ -519,6 +741,7 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
     showRFRadius, 
     showPowerGrid, 
     showMeshHops, 
+    showInterventions,
     selectedVillageId, 
     isTowerAOnAir, 
     isTowerBOnAir, 
@@ -602,9 +825,67 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
             >
               Mesh Hops {showMeshHops ? '[ON]' : '[OFF]'}
             </button>
+            <button
+              onClick={() => setShowInterventions(!showInterventions)}
+              className={`px-2 py-1 rounded-[2px] transition-all text-[0.7rem] ${
+                showInterventions
+                  ? activeInterventionsCount > 0
+                    ? 'bg-emerald-700 text-white font-bold shadow-xs'
+                    : 'bg-white text-[var(--navy)] font-bold shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Interventions {showInterventions ? `[ON · ${activeInterventionsCount}]` : '[OFF]'}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Applied Network Plan & Active Interventions HUD Status Strip */}
+      {activeInterventionsCount > 0 && (
+        <div className="bg-slate-900 border border-emerald-500/50 px-3.5 py-2 rounded-[3px] flex flex-wrap items-center justify-between gap-2 text-xs font-mono-numbers shadow-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-heading font-bold text-white text-[0.8rem]">
+              {appliedPlan ? appliedPlan.planName : 'Active Network Interventions Deployed'}
+            </span>
+            <span className="stamp-label stamp-verified text-[0.6rem]">CANONICAL GIS OVERLAY</span>
+            <span className="text-emerald-300 text-[0.72rem]">
+              ({activeInterventionsCount} deployed · {appliedPlan ? `${appliedPlan.totalCost}u / ${appliedPlan.budget}u budget consumed` : 'custom allocation'})
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {interventions.backup_generation && (
+              <span className="text-[0.68rem] px-2 py-0.5 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 rounded font-semibold">
+                ⚡🔋 Diesel Gen (20u)
+              </span>
+            )}
+            {interventions.mobile_broadcast_unit && (
+              <span className="text-[0.68rem] px-2 py-0.5 bg-sky-950/80 border border-sky-500/40 text-sky-300 rounded font-semibold">
+                🚚 Mobile FM (30u)
+              </span>
+            )}
+            {interventions.second_gateway && (
+              <span className="text-[0.68rem] px-2 py-0.5 bg-amber-950/80 border border-amber-500/40 text-amber-300 rounded font-semibold">
+                🛰 2nd Sat GW (40u)
+              </span>
+            )}
+            {(interventions.siren_responders?.length || 0) > 0 && (
+              <span className="text-[0.68rem] px-2 py-0.5 bg-amber-950/80 border border-amber-500/40 text-amber-300 rounded font-semibold">
+                📢 {interventions.siren_responders.length} Siren Patrols
+              </span>
+            )}
+            {onResetInterventions && (
+              <button
+                onClick={onResetInterventions}
+                className="px-2 py-0.5 bg-red-900/60 hover:bg-red-800 text-red-200 border border-red-500/40 rounded text-[0.68rem] font-bold transition-colors ml-1"
+              >
+                Reset Network
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 2. Primary Coastal Operations Geospatial Satellite Canvas */}
       <div className="relative w-full bg-[#051426] border border-[#143B63] rounded-[3px] overflow-hidden shadow-inner">
@@ -665,7 +946,7 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 text-[0.7rem] text-slate-300">
+          <div className="flex flex-wrap items-center gap-2.5 text-[0.68rem] text-slate-300">
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-[#22C55E]" /> Substation OK
             </span>
@@ -675,6 +956,23 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-[#F4B942]" /> Mesh Hop Link
             </span>
+            {activeInterventionsCount > 0 && (
+              <>
+                <span className="text-slate-600">|</span>
+                <span className="flex items-center gap-1 text-emerald-300">
+                  <span>⚡🔋</span> Gen (20u)
+                </span>
+                <span className="flex items-center gap-1 text-sky-300">
+                  <span>🚚</span> Mobile FM (30u)
+                </span>
+                <span className="flex items-center gap-1 text-amber-300">
+                  <span>📢</span> Siren (10u)
+                </span>
+                <span className="flex items-center gap-1 text-amber-300">
+                  <span>🛰</span> 2nd GW (40u)
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

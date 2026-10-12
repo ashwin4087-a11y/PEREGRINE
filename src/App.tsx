@@ -23,6 +23,7 @@ import { NetworkMapAndGraph } from './components/NetworkMapAndGraph';
 import { SilenceClockGrid } from './components/SilenceClockGrid';
 import { RedundancyIllusionPanel } from './components/RedundancyIllusionPanel';
 import { DecisionEngineView } from './components/DecisionEngineView';
+import { AppliedPlanInfo } from './planner/engine';
 import { OutagePlanMatrix } from './components/OutagePlanMatrix';
 import { AuditPanel } from './components/AuditPanel';
 import { SensitivityPanel } from './components/SensitivityPanel';
@@ -113,6 +114,9 @@ export default function App() {
     type: 'success' | 'info';
   } | null>(null);
 
+  // Applied recovery plan metadata & simulation snapshot
+  const [appliedPlan, setAppliedPlan] = useState<AppliedPlanInfo | null>(null);
+
   // Selected village for inspector modal
   const [selectedVillageId, setSelectedVillageId] = useState<string | null>(null);
 
@@ -125,6 +129,7 @@ export default function App() {
   const handlePresetHealthy = () => {
     setFailures(applyHealthyPreset());
     setInterventions(createEmptyInterventions());
+    setAppliedPlan(null);
     setAppliedPlanToast(null);
   };
 
@@ -357,21 +362,28 @@ export default function App() {
             aria-live="polite"
             className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-2.5 rounded-[4px] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono-numbers shadow-xs"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span className="font-semibold">{appliedPlanToast.message}</span>
+              {appliedPlan && (
+                <span className="px-2 py-0.5 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded text-[0.7rem] font-bold">
+                  +{appliedPlan.gainPts}% Reach Restored ({appliedPlan.totalCost}u / {appliedPlan.budget}u)
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {activeTab !== 'overview' && (
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className="px-2.5 py-1 bg-white border border-sky-300 text-sky-800 hover:bg-sky-50 rounded-[3px] text-[0.7rem] font-bold transition-colors shadow-2xs"
+                >
+                  View on GIS Map
+                </button>
+              )}
               <button
                 onClick={() => {
-                  setInterventions({
-                    backup_generation: false,
-                    mobile_broadcast_unit: false,
-                    second_gateway: false,
-                    relay_nodes: [],
-                    siren_responders: [],
-                    community_kits: []
-                  });
+                  setInterventions(createEmptyInterventions());
+                  setAppliedPlan(null);
                   setAppliedPlanToast(null);
                 }}
                 className="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 rounded-[3px] text-[0.7rem] font-bold transition-colors"
@@ -501,9 +513,15 @@ export default function App() {
               villages={config.villages}
               failures={failures}
               interventions={interventions}
+              appliedPlan={appliedPlan}
               onToggleFailure={handleToggleFailure}
               selectedVillageId={selectedVillageId}
               onSelectVillage={id => setSelectedVillageId(id)}
+              onResetInterventions={() => {
+                setInterventions(createEmptyInterventions());
+                setAppliedPlan(null);
+                setAppliedPlanToast(null);
+              }}
             />
 
             {/* Aligned Operational Panels: Subsystem Diagnostics, Key Findings, Quick Actions */}
@@ -917,20 +935,30 @@ export default function App() {
               <DecisionEngineView 
                 config={config} 
                 failures={failures} 
+                interventions={interventions}
+                appliedPlan={appliedPlan}
                 autoTune={0.5} 
-                onApplyPlan={(planInterventions, planName) => {
+                onApplyPlan={(planInterventions, planName, meta) => {
                   setInterventions(planInterventions);
+                  setAppliedPlan(meta || null);
                   setAppliedPlanToast({
-                    message: `${planName} applied to active simulation. Interventions deployed.`,
+                    message: `${planName} applied to active simulation. Interventions deployed to GIS network.`,
                     type: 'success'
                   });
                 }}
+                onResetInterventions={() => {
+                  setInterventions(createEmptyInterventions());
+                  setAppliedPlan(null);
+                  setAppliedPlanToast(null);
+                }}
+                onNavigateToMap={() => setActiveTab('overview')}
               />
             ) : (
               <OutagePlanMatrix
                 config={config}
                 onSelectPlan={(planInterventions, planName) => {
                   setInterventions(planInterventions);
+                  setAppliedPlan(null);
                   setAppliedPlanToast({
                     message: `${planName || 'Outage Restoration Plan'} applied to active simulation. Interventions deployed.`,
                     type: 'success'

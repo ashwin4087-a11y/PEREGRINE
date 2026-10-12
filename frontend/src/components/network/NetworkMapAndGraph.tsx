@@ -293,10 +293,43 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
             </text>
           </g>
 
+          {/* Applied Interventions Overlays */}
+          {interventions.backup_generation && (
+            <g transform="translate(130, 420)">
+              <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#ECFDF5" stroke="#10B981" strokeWidth="2" />
+              <text x="14" y="4" fill="#065F46" fontSize="9" fontFamily="'Azeret Mono', monospace" fontWeight="bold">
+                ⚡🔋 Diesel Gen (20u)
+              </text>
+            </g>
+          )}
+
+          {interventions.mobile_broadcast_unit && (
+            <g transform="translate(260, 290)">
+              <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#F0F9FF" stroke="#0284C7" strokeWidth="2" />
+              <text x="14" y="4" fill="#0369A1" fontSize="9" fontFamily="'Azeret Mono', monospace" fontWeight="bold">
+                🚚 Mobile FM (30u)
+              </text>
+            </g>
+          )}
+
+          {interventions.second_gateway && (
+            <g transform="translate(320, 110)">
+              <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#FFFBEB" stroke="#F59E0B" strokeWidth="2" />
+              <text x="14" y="4" fill="#92400E" fontSize="9" fontFamily="'Azeret Mono', monospace" fontWeight="bold">
+                🛰 2nd Sat Gateway (40u)
+              </text>
+            </g>
+          )}
+
           {/* Village Settlement Nodes */}
           {villages.map(v => {
             const isSelected = selectedVillageId === v.id;
-            const isIsolated = !v.tower && !v.fm;
+            const hasSiren = Boolean(interventions.siren_responders?.includes(v.id));
+            const hasKit = Boolean(interventions.community_kits?.includes(v.id));
+            const isIsolated = !v.tower && !v.fm && !hasSiren && !hasKit;
+
+            const circleFill = hasSiren ? '#FDE68A' : hasKit ? '#A7F3D0' : isIsolated ? '#EF4444' : '#FFFFFF';
+            const circleStroke = hasSiren ? '#D97706' : hasKit ? '#059669' : isIsolated ? '#DC2626' : isSelected ? '#2563EB' : '#475569';
 
             return (
               <g
@@ -309,22 +342,26 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
                   <circle r="18" fill="none" stroke="#2563EB" strokeWidth="2" strokeDasharray="3 3" />
                 )}
 
+                {hasSiren && (
+                  <circle r="22" fill="none" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="3 3" opacity="0.8" />
+                )}
+
                 <circle
                   r={isSelected ? 10 : 8}
-                  fill={isIsolated ? '#EF4444' : '#FFFFFF'}
-                  stroke={isIsolated ? '#DC2626' : isSelected ? '#2563EB' : '#475569'}
+                  fill={circleFill}
+                  stroke={circleStroke}
                   strokeWidth="2.5"
                 />
 
                 <rect
                   x="13"
                   y="-11"
-                  width={v.name.length * 7.5 + 16}
+                  width={v.name.length * 7.5 + (hasSiren || hasKit ? 55 : 16)}
                   height="20"
                   rx="4"
                   fill="#FFFFFF"
-                  stroke={isSelected ? '#2563EB' : '#CBD5E1'}
-                  strokeWidth={isSelected ? '1.5' : '1'}
+                  stroke={isSelected ? '#2563EB' : hasSiren ? '#F59E0B' : '#CBD5E1'}
+                  strokeWidth={isSelected || hasSiren ? '1.5' : '1'}
                   className="shadow-xs"
                 />
                 <text
@@ -335,7 +372,7 @@ export const NetworkMapAndGraph: React.FC<NetworkMapAndGraphProps> = ({
                   fontFamily="'Inter', sans-serif"
                   fontWeight="600"
                 >
-                  {v.name}
+                  {v.name} {hasSiren ? '📢' : hasKit ? '📦' : ''}
                 </text>
               </g>
             );
