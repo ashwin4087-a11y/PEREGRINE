@@ -51,13 +51,6 @@ export const NAV_ITEMS = [
     description: 'Fairness-constrained decision engine & 72h outage restoration matrix',
     icon: Scale 
   },
-  { 
-    id: 'alert_integrity', 
-    label: 'Alert Integrity', 
-    shortLabel: 'Alert Integrity', 
-    description: 'Real ECDSA P-256 signatures, SHA-256 verification & siren alerts',
-    icon: Key 
-  },
 ] as const;
 
 export type NavTabId = (typeof NAV_ITEMS)[number]['id'];

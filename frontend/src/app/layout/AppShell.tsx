@@ -24,6 +24,7 @@ interface AppShellProps {
   onCloseVillageModal: () => void;
   isDemoActive?: boolean;
   onStartDemo?: () => void;
+  onOpenCryptoAudit?: () => void;
   demoTourNode?: React.ReactNode;
   isBackendConnected?: boolean | null;
   children: React.ReactNode;
@@ -46,6 +47,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onCloseVillageModal,
   isDemoActive,
   onStartDemo,
+  onOpenCryptoAudit,
   demoTourNode,
   isBackendConnected = null,
   children
@@ -60,6 +62,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         onSelectTab={onSelectTab}
         isDemoActive={isDemoActive}
         onStartDemo={onStartDemo}
+        onOpenCryptoAudit={onOpenCryptoAudit}
         isBackendConnected={isBackendConnected}
         isOpenMobile={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}

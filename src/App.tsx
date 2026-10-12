@@ -76,13 +76,6 @@ const NAV_ITEMS = [
     description: 'Dual-objective decision engine & 72h outage restoration matrix',
     icon: Scale 
   },
-  { 
-    id: 'alert_integrity', 
-    label: 'Alert Integrity', 
-    shortLabel: 'Alert Integrity', 
-    description: 'Real ECDSA P-256 signatures, SHA-256 verification & siren alerts',
-    icon: Key 
-  },
 ] as const;
 
 type NavTabId = (typeof NAV_ITEMS)[number]['id'];
@@ -120,6 +113,15 @@ export default function App() {
 
   // Mobile / tablet navigation menu toggle state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
+  // Optional WebCrypto audit console modal state (accessible without dominating primary nav)
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState<boolean>(false);
+
+  // Applied recovery plan feedback notification
+  const [appliedPlanToast, setAppliedPlanToast] = useState<{
+    message: string;
+    type: 'success' | 'info';
+  } | null>(null);
 
   // Selected village for inspector modal
   const [selectedVillageId, setSelectedVillageId] = useState<string | null>(null);
@@ -284,6 +286,16 @@ export default function App() {
               {isGatewayLostPreset ? 'Gateway Lost [SEVERED · 0%]' : 'Gateway Lost (Demo)'}
             </button>
 
+            {/* Optional Cryptographic Audit launcher */}
+            <button
+              onClick={() => setIsAuditModalOpen(true)}
+              title="Inspect WebCrypto ECDSA P-256 signatures, verification & siren alerts"
+              className="text-xs px-2.5 py-1.5 rounded-[3px] font-mono-numbers font-semibold bg-white border border-[var(--border)] text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] shadow-xs"
+            >
+              <Key className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Crypto Integrity</span>
+            </button>
+
             <span className={`text-[0.7rem] px-2.5 py-1 rounded-[2px] font-mono-numbers font-bold border ${
               activeFailureCount === 0
                 ? 'bg-emerald-50 text-[var(--green-text)] border-emerald-200'
@@ -392,6 +404,44 @@ export default function App() {
 
       {/* 2. Primary Content Area (Natural vertical scrolling, balanced hierarchy) */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Applied Plan & Active Interventions Feedback Banner */}
+        {appliedPlanToast && (
+          <div 
+            role="status"
+            aria-live="polite"
+            className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-2.5 rounded-[4px] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono-numbers shadow-xs"
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-semibold">{appliedPlanToast.message}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  setInterventions({
+                    backup_generation: false,
+                    mobile_broadcast_unit: false,
+                    second_gateway: false,
+                    relay_nodes: [],
+                    siren_responders: [],
+                    community_kits: []
+                  });
+                  setAppliedPlanToast(null);
+                }}
+                className="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 rounded-[3px] text-[0.7rem] font-bold transition-colors"
+              >
+                Reset Interventions
+              </button>
+              <button
+                onClick={() => setAppliedPlanToast(null)}
+                className="text-emerald-700 hover:text-emerald-900 text-sm font-bold px-1"
+                aria-label="Dismiss banner"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
         {activeTab === 'overview' && (
           <div className="space-y-6 sm:space-y-8">
             {/* Overview Header & Controls Context */}
@@ -728,23 +778,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-
-            {/* Lower In-Depth Operational Grids */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-              <SilenceClockGrid
-                villages={s72Result.villages}
-                totalScenarioHours={72}
-                onSelectVillage={id => setSelectedVillageId(id)}
-                selectedVillageId={selectedVillageId}
-              />
-
-              <RedundancyIllusionPanel
-                statusList={illusionStatus}
-                villages={config.villages}
-                onSelectVillage={id => setSelectedVillageId(id)}
-                selectedVillageId={selectedVillageId}
-              />
-            </div>
           </div>
         )}
 
@@ -935,7 +968,18 @@ export default function App() {
             </div>
 
             {recoveryPlannerSection === 'decision_engine' ? (
-              <DecisionEngineView config={config} failures={failures} autoTune={0.5} />
+              <DecisionEngineView 
+                config={config} 
+                failures={failures} 
+                autoTune={0.5} 
+                onApplyPlan={(planInterventions, planName) => {
+                  setInterventions(planInterventions);
+                  setAppliedPlanToast({
+                    message: `${planName} applied to active simulation. Interventions deployed.`,
+                    type: 'success'
+                  });
+                }}
+              />
             ) : (
               <OutagePlanMatrix
                 config={config}
@@ -945,26 +989,6 @@ export default function App() {
                 }}
               />
             )}
-          </div>
-        )}
-
-        {activeTab === 'alert_integrity' && (
-          <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-end justify-between pb-4 border-b border-[var(--border)] gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-heading font-extrabold text-2xl text-[var(--navy)] tracking-tight">
-                    Cryptographic Alert Integrity &amp; Audit Console
-                  </h2>
-                  <span className="stamp-label stamp-verified">ECDSA P-256 REAL SIGNATURES</span>
-                </div>
-                <p className="text-xs text-[var(--muted)] mt-1 max-w-3xl leading-relaxed">
-                  Live ECDSA P-256 signature generation, SHA-256 tamper verification, authenticated withdrawal chains, and acoustic siren alerts.
-                </p>
-              </div>
-            </div>
-
-            <AuditPanel />
           </div>
         )}
       </main>
@@ -1041,7 +1065,34 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. Shared Footer */}
+      {/* 4. Optional Cryptographic Integrity Modal */}
+      {isAuditModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[var(--border)] shadow-2xl rounded-[4px] max-w-4xl w-full max-h-[90vh] flex flex-col font-mono-numbers text-xs">
+            <div className="flex justify-between items-center p-4 border-b border-[var(--border)] bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-[var(--navy)]" />
+                <h3 className="font-heading font-extrabold text-base text-[var(--navy)]">
+                  Cryptographic Alert Integrity &amp; WebCrypto Audit Console
+                </h3>
+                <span className="stamp-label stamp-verified text-[0.6rem]">ECDSA P-256</span>
+              </div>
+              <button
+                onClick={() => setIsAuditModalOpen(false)}
+                aria-label="Close Crypto Audit Console"
+                className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4">
+              <AuditPanel />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Shared Footer */}
       <footer className="bg-white border-t border-[var(--border)] py-6 text-xs font-mono-numbers text-[var(--muted)] mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -1050,7 +1101,14 @@ export default function App() {
               PEREGRINE v2.1 · IEEE BTS Hackathon · Disaster-Resilient Broadcast Network
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsAuditModalOpen(true)}
+              className="text-xs hover:text-[var(--navy)] flex items-center gap-1 underline text-slate-600 hover:text-blue-700 transition-colors"
+            >
+              <Key className="w-3.5 h-3.5 text-slate-400" />
+              <span>WebCrypto Audit Console</span>
+            </button>
             <span className="stamp-label stamp-simulation text-[0.6rem]">
               DECISION-SUPPORT SIMULATION ONLY
             </span>

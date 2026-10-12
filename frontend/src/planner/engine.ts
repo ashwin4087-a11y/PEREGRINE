@@ -47,6 +47,14 @@ export { calculateFairnessShortfall } from './objectives';
 export type { CandidateIntervention } from './interventions';
 export { getCandidateInterventions, applyCandidateToInterventions } from './interventions';
 
+export function candidatesToActiveInterventions(candidates: CandidateIntervention[]): ActiveInterventions {
+  let interventions = createEmptyInterventions();
+  for (const c of candidates) {
+    interventions = applyCandidateToInterventions(interventions, c);
+  }
+  return interventions;
+}
+
 export interface StrategyComparisonOutcome {
   planReach: PlanComparisonResult;
   planFairness: PlanComparisonResult;

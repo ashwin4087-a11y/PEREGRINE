@@ -6,11 +6,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { SystemConfig } from '../model/config';
-import { NetworkFailureState } from '../model/graph';
+import { NetworkFailureState, ActiveInterventions } from '../model/graph';
 import { 
   compareRecoveryStrategies, 
   PlannerScenarioMode,
-  CandidateIntervention
+  CandidateIntervention,
+  candidatesToActiveInterventions
 } from '../planner/engine';
 import { 
   Scale, 
@@ -20,21 +21,24 @@ import {
   ChevronRight, 
   TrendingUp, 
   HeartHandshake, 
-  Info,
-  Clock,
-  Sparkles
+  Info, 
+  Clock, 
+  Sparkles,
+  Zap
 } from 'lucide-react';
 
 interface DecisionEngineViewProps {
   config: SystemConfig;
   failures: NetworkFailureState;
   autoTune?: number;
+  onApplyPlan?: (interventions: ActiveInterventions, planName: string) => void;
 }
 
 export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
   config,
   failures,
-  autoTune = 0.5
+  autoTune = 0.5,
+  onApplyPlan
 }) => {
   const [budget, setBudget] = useState<number>(50);
   const [fairnessFloor, setFairnessFloor] = useState<number>(0.35); // 35% reach floor
@@ -267,6 +271,16 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
                 <span className="text-xs text-slate-400 italic">None affordable within budget</span>
               )}
             </div>
+
+            {onApplyPlan && planReach.chosenInterventions.length > 0 && (
+              <button
+                onClick={() => onApplyPlan(candidatesToActiveInterventions(planReach.chosenInterventions), 'Plan A: Reach Maximiser')}
+                className="mt-3 w-full py-2 px-3 bg-[var(--navy)] hover:bg-slate-800 text-white font-mono-numbers text-xs font-bold rounded flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+              >
+                <Zap className="w-3.5 h-3.5 text-blue-400" />
+                <span>Apply Plan A to Network</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -341,6 +355,16 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
                 <span className="text-xs text-slate-400 italic">None affordable within budget</span>
               )}
             </div>
+
+            {onApplyPlan && planFairness.chosenInterventions.length > 0 && (
+              <button
+                onClick={() => onApplyPlan(candidatesToActiveInterventions(planFairness.chosenInterventions), 'Plan B: Fairness-Floor Optimizer')}
+                className="mt-3 w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-mono-numbers text-xs font-bold rounded flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
+                <span>Apply Plan B to Network</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

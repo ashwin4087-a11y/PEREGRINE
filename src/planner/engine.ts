@@ -190,6 +190,14 @@ export function applyCandidateToInterventions(
   return next;
 }
 
+export function candidatesToActiveInterventions(candidates: CandidateIntervention[]): ActiveInterventions {
+  let interventions = createEmptyInterventions();
+  for (const c of candidates) {
+    interventions = applyCandidateToInterventions(interventions, c);
+  }
+  return interventions;
+}
+
 /**
  * Evaluates simulation state for either S72 or S30 without fabricated adjustments
  */

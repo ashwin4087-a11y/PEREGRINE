@@ -35,7 +35,9 @@ import {
   Layers, 
   Scale,
   Calendar,
-  Sliders
+  Sliders,
+  Key,
+  X
 } from 'lucide-react';
 
 import { OverviewPage } from '../pages/OverviewPage';
@@ -77,8 +79,11 @@ export default function App() {
     type: 'success' | 'warning' | 'error' | 'info';
   } | null>(null);
 
-  // Active Navigation Tab (5 Primary Operational Destinations)
+  // Active Navigation Tab (4 Primary Operational Destinations)
   const [activeTab, setActiveTab] = useState<NavTabId>('overview');
+
+  // Optional WebCrypto audit modal state
+  const [isCryptoModalOpen, setIsCryptoModalOpen] = useState<boolean>(false);
 
   // Secondary sub-tab section state
   const [failureAnalysisSection, setFailureAnalysisSection] = useState<'redundancy' | 'stress'>('redundancy');
@@ -340,6 +345,7 @@ export default function App() {
       onCloseVillageModal={() => setSelectedVillageId(null)}
       isDemoActive={demoStep !== null}
       onStartDemo={handleStartDemo}
+      onOpenCryptoAudit={() => setIsCryptoModalOpen(true)}
       isBackendConnected={isBackendConnected}
       demoTourNode={
         demoStep !== null ? (
@@ -496,6 +502,13 @@ export default function App() {
               config={config}
               failures={failures}
               autoTune={0.5}
+              onApplyPlan={(planInterventions, planName) => {
+                setInterventions(planInterventions);
+                setScenarioFeedback({
+                  message: `${planName} applied to active simulation. Interventions deployed.`,
+                  type: 'success'
+                });
+              }}
             />
           ) : (
             <OutageMatrixPage
@@ -509,8 +522,33 @@ export default function App() {
         </div>
       )}
 
-      {activeTab === 'alert_integrity' && (
-        <CryptographyPage />
+      {/* WebCrypto Alert Integrity & Audit Console Modal */}
+      {isCryptoModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[#CBD5E1] shadow-2xl rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden font-sans-ui">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+              <div className="flex items-center gap-2">
+                <Key className="w-5 h-5 text-[#2563EB]" />
+                <h3 className="font-bold text-base text-[#172033]">
+                  Cryptographic Alert Integrity &amp; WebCrypto Audit Console
+                </h3>
+                <span className="text-[10px] font-mono-numbers px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
+                  ECDSA P-256
+                </span>
+              </div>
+              <button
+                onClick={() => setIsCryptoModalOpen(false)}
+                aria-label="Close Crypto Audit Console"
+                className="p-1 hover:bg-[#E2E8F0] rounded text-[#64748B] hover:text-[#172033] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4">
+              <CryptographyPage />
+            </div>
+          </div>
+        </div>
       )}
     </AppShell>
   );

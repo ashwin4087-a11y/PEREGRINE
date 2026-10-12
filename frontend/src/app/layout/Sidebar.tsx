@@ -20,6 +20,7 @@ interface SidebarProps {
   onSelectTab: (tabId: NavTabId) => void;
   isDemoActive?: boolean;
   onStartDemo?: () => void;
+  onOpenCryptoAudit?: () => void;
   isBackendConnected?: boolean | null;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
@@ -30,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   isDemoActive,
   onStartDemo,
+  onOpenCryptoAudit,
   isBackendConnected,
   isOpenMobile = false,
   onCloseMobile
@@ -42,10 +44,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'RECOVERY PLANNING',
       items: NAV_ITEMS.filter(item => ['recovery_planner'].includes(item.id))
-    },
-    {
-      title: 'INTEGRITY & VERIFICATION',
-      items: NAV_ITEMS.filter(item => ['alert_integrity'].includes(item.id))
     }
   ];
 
@@ -136,6 +134,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Guided Walkthrough Launcher & System Footer */}
       <div className="p-3 border-t border-[#E2E8F0] space-y-2 bg-[#F8FAFC]">
+        {onOpenCryptoAudit && (
+          <button
+            onClick={onOpenCryptoAudit}
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md border border-[#E2E8F0] bg-white text-[#475569] hover:text-[#172033] hover:bg-[#F1F5F9] transition-all"
+            title="Inspect ECDSA P-256 digital signatures & siren alert integrity"
+          >
+            <Key className="w-3.5 h-3.5 text-[#64748B]" />
+            <span>WebCrypto Audit Console</span>
+          </button>
+        )}
+
         {onStartDemo && (
           <button
             onClick={onStartDemo}
