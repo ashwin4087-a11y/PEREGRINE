@@ -1,12 +1,9 @@
-/**
- * PEREGRINE — Outage Matrix Page (Section 6.5 & 6.6)
- * 12-cell restoration benchmark comparing infrastructure recovery plans across auto-tune adoption curves.
- */
-
 import React from 'react';
 import { SystemConfig } from '../model/config';
 import { ActiveInterventions } from '../model/types';
 import { OutagePlanMatrix } from '../components/outage-matrix/OutagePlanMatrix';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatusBadge } from '../components/ui/StatusBadge';
 
 interface OutageMatrixPageProps {
   config: SystemConfig;
@@ -19,19 +16,17 @@ export const OutageMatrixPage: React.FC<OutageMatrixPageProps> = ({
 }) => {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end justify-between pb-4 border-b border-[var(--border)] gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="font-heading font-extrabold text-2xl text-[var(--navy)] tracking-tight">
-              72-Hour Outage Plan Matrix
-            </h2>
-            <span className="stamp-label stamp-simulation">S72 MODEL</span>
-          </div>
-          <p className="text-xs text-[var(--muted)] mt-1 max-w-3xl leading-relaxed">
-            12-cell restoration benchmark comparing backup generation, mobile transmission units, and auto-tune listener adoption.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="72-Hour Outage Plan Matrix"
+        category="Restoration Analysis"
+        description="12-cell restoration benchmark evaluating emergency generation, mobile broadcast units, and listener auto-tune adoption curves across an extended 72-hour utility failure."
+        statusBadge={
+          <StatusBadge
+            status="operational"
+            label="S72 Benchmark"
+          />
+        }
+      />
 
       <OutagePlanMatrix
         config={config}

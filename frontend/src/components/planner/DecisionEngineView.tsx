@@ -1,9 +1,3 @@
-/**
- * PEREGRINE — Decision Engine View (Section 10)
- * Dual-Objective Recovery Planner: Reach Maximiser vs Fairness-Constrained Floor
- * Enforces fairness floors algorithmically, evaluates real failures, and reports insights honestly.
- */
-
 import React, { useState, useMemo } from 'react';
 import { SystemConfig } from '../../model/config';
 import { NetworkFailureState } from '../../model/graph';
@@ -11,23 +5,21 @@ import {
   compareRecoveryStrategies, 
   calculatePriceOfFairnessFrontier,
   evaluateOptimizerBenchmarking,
-  PlannerScenarioMode,
-  CandidateIntervention
+  PlannerScenarioMode
 } from '../../planner/engine';
 import { 
-  Scale, 
   Coins, 
-  CheckCircle2, 
-  AlertTriangle, 
-  ChevronRight, 
-  TrendingUp, 
   HeartHandshake, 
-  Info,
-  Clock,
-  Sparkles,
-  BarChart3,
-  Cpu
+  TrendingUp, 
+  Sparkles, 
+  BarChart3, 
+  Cpu, 
+  Sliders, 
+  ChevronDown,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
+import { StatusBadge } from '../ui/StatusBadge';
 
 interface DecisionEngineViewProps {
   config: SystemConfig;
@@ -41,17 +33,17 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
   autoTune = 0.5
 }) => {
   const [budget, setBudget] = useState<number>(50);
-  const [fairnessFloor, setFairnessFloor] = useState<number>(0.23); // Default to highest feasible floor (23%) at budget 50
+  const [fairnessFloor, setFairnessFloor] = useState<number>(0.23); // Default feasible floor (23%)
   const [scenarioMode, setScenarioMode] = useState<PlannerScenarioMode>('S72');
 
   // Active failures label
   const activeFailureList = Object.entries(failures)
     .filter(([_, failed]) => failed)
-    .map(([node]) => node.replace('_', ' ').toUpperCase());
+    .map(([node]) => node.replace('_', ' '));
 
   const failureSummary = activeFailureList.length > 0 
     ? activeFailureList.join(', ')
-    : 'NONE (HEALTHY BASELINE)';
+    : 'Healthy Baseline (Zero Failures)';
 
   // Run dynamic comparison on identical scenario, budget, and failures
   const { planReach, planFairness, disadvantaged, comparisonInsight } = useMemo(() => {
@@ -77,70 +69,67 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-[var(--border)] gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="font-heading font-extrabold text-xl text-[var(--navy)] tracking-tight">
-              Recovery Decision Engine
-            </h2>
-            <span className="stamp-label stamp-simulation text-[0.6rem]">
-              OPTIMIZATION ALGORITHM
-            </span>
+      {/* 1 & 2. Scenario Constraints, Budget & Fairness Controls */}
+      <div className="bg-white border border-[#E2E8F0] rounded-lg shadow-xs p-5 sm:p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#E2E8F0] gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-[#172033]">
+              Planning Constraints & Resource Controls
+            </h3>
+            <p className="text-xs text-[#64748B] mt-0.5">
+              Configure capital budget and community equity threshold for automated recovery.
+            </p>
           </div>
-          <p className="text-sm text-[var(--muted)] mt-0.5">
-            Compares reach-maximising investment against a strictly enforced community fairness floor.
-          </p>
+
+          {/* Scenario Mode Switcher (S72 vs S30) */}
+          <div className="flex items-center gap-1.5 p-1 bg-[#F1F5F9] rounded-md text-xs">
+            <span className="text-[#64748B] px-1.5 font-medium">Evaluation Horizon:</span>
+            <button
+              onClick={() => setScenarioMode('S72')}
+              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                scenarioMode === 'S72'
+                  ? 'bg-white text-[#172033] font-semibold shadow-xs'
+                  : 'text-[#64748B] hover:text-[#172033]'
+              }`}
+            >
+              72h Outage (S72)
+            </button>
+            <button
+              onClick={() => setScenarioMode('S30')}
+              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                scenarioMode === 'S30'
+                  ? 'bg-white text-[#172033] font-semibold shadow-xs'
+                  : 'text-[#64748B] hover:text-[#172033]'
+              }`}
+            >
+              30m Alert Window (S30)
+            </button>
+          </div>
         </div>
 
-        {/* Scenario Mode Switcher (S72 vs S30) */}
-        <div className="flex items-center gap-2 p-1 bg-slate-100 rounded border border-[var(--border)]">
-          <button
-            onClick={() => setScenarioMode('S72')}
-            className={`px-3 py-1 text-xs font-mono-numbers font-semibold rounded transition-colors ${
-              scenarioMode === 'S72'
-                ? 'bg-white text-[var(--navy)] shadow-sm font-bold'
-                : 'text-[var(--muted)] hover:text-[var(--ink)]'
-            }`}
-          >
-            S72: 72h Outage Plan
-          </button>
-          <button
-            onClick={() => setScenarioMode('S30')}
-            className={`px-3 py-1 text-xs font-mono-numbers font-semibold rounded transition-colors ${
-              scenarioMode === 'S30'
-                ? 'bg-white text-[var(--navy)] shadow-sm font-bold'
-                : 'text-[var(--muted)] hover:text-[var(--ink)]'
-            }`}
-          >
-            S30: 30-Min Alert Window
-          </button>
-        </div>
-      </div>
-
-      {/* Control Bench: Budget, Floor & Active Failure Context */}
-      <div className="utility-card p-5 sm:p-6 space-y-4 rounded-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono-numbers pb-3 border-b border-slate-100 gap-2">
+        {/* Active Failures Summary Strip */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2 text-[#64748B] bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 py-2.5 rounded-md">
           <div className="flex items-center gap-2">
-            <span className="text-[var(--muted)]">ACTIVE FAILURE SCENARIO:</span>
-            <span className="font-bold text-[var(--navy)] px-2.5 py-0.5 bg-slate-50 border border-slate-200/80 rounded-md">
+            <span className="font-medium text-[#172033]">Active Fault State:</span>
+            <span className="text-slate-800 font-medium">
               {failureSummary}
             </span>
           </div>
-          <div className="text-[var(--muted)]">
-            EVALUATED HORIZON: <span className="font-bold text-[var(--ink)]">{scenarioMode === 'S72' ? '72 Hours (FM & Backup Kits)' : '30 Minutes (Cell, FM, Mesh, Sirens)'}</span>
+          <div>
+            Modeled Scope: <span className="font-medium text-[#172033]">{scenarioMode === 'S72' ? '72h Utility Outage (FM, Power, Kits)' : '30-Min Rapid Broadcast (Cell, FM, Mesh, Sirens)'}</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
+        {/* Sliders Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           {/* Budget Slider */}
           <div>
-            <div className="flex justify-between items-center text-xs font-mono-numbers mb-2">
-              <label className="font-bold text-[var(--navy)] flex items-center gap-1.5">
-                <Coins className="w-4 h-4 text-[var(--amber-text)]" />
-                TOTAL RECOVERY BUDGET:
+            <div className="flex justify-between items-center text-xs mb-2">
+              <label className="font-semibold text-[#172033] flex items-center gap-1.5">
+                <Coins className="w-4 h-4 text-[#D97706]" />
+                Recovery Capital Budget
               </label>
-              <span className="font-bold text-sm text-[var(--navy-deep)] px-2.5 py-0.5 bg-slate-50 border border-slate-200/80 rounded-md">
+              <span className="font-bold text-sm text-[#172033] font-mono-numbers px-2.5 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-md">
                 {budget} Units
               </span>
             </div>
@@ -151,24 +140,24 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
               step="5"
               value={budget}
               onChange={e => setBudget(Number(e.target.value))}
-              className="w-full accent-[var(--navy)] cursor-pointer"
+              className="w-full accent-[#2563EB] cursor-pointer"
             />
-            <div className="flex justify-between text-[0.7rem] text-[var(--muted)] font-mono-numbers mt-1">
-              <span>10 units (austere)</span>
-              <span>50 units (balanced)</span>
-              <span>100 units (full reserve)</span>
+            <div className="flex justify-between text-[11px] text-[#64748B] mt-1.5">
+              <span>10u (austere)</span>
+              <span>50u (standard reserve)</span>
+              <span>100u (full reserve)</span>
             </div>
           </div>
 
           {/* Fairness Floor Slider & Presets */}
           <div>
-            <div className="flex justify-between items-center text-xs font-mono-numbers mb-2">
-              <label className="font-bold text-[var(--navy)] flex items-center gap-1.5">
-                <HeartHandshake className="w-4 h-4 text-[var(--green-text)]" />
-                MINIMUM COMMUNITY FAIRNESS FLOOR (F):
+            <div className="flex justify-between items-center text-xs mb-2">
+              <label className="font-semibold text-[#172033] flex items-center gap-1.5">
+                <HeartHandshake className="w-4 h-4 text-emerald-600" />
+                Minimum Community Fairness Floor
               </label>
-              <span className="font-bold text-sm text-[var(--green-text)] px-2.5 py-0.5 bg-slate-50 border border-slate-200/80 rounded-md">
-                {(fairnessFloor * 100).toFixed(0)}% Reach
+              <span className="font-bold text-sm text-emerald-700 font-mono-numbers px-2.5 py-0.5 bg-emerald-50 border border-emerald-200 rounded-md">
+                {(fairnessFloor * 100).toFixed(0)}% Min Reach
               </span>
             </div>
             <input
@@ -178,78 +167,320 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
               step="0.01"
               value={fairnessFloor}
               onChange={e => setFairnessFloor(Number(e.target.value))}
-              className="w-full accent-[var(--green)] cursor-pointer"
+              className="w-full accent-emerald-600 cursor-pointer"
             />
             
-            {/* Quick Floor Selectors: Feasible vs Infeasible */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-2 font-mono-numbers text-[0.7rem]">
+            {/* Quick Floor Selectors */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px]">
               <button
                 onClick={() => setFairnessFloor(Number((frontierSummary.bestAchievableMinVillageReach / 100).toFixed(3)) || 0.229)}
-                className={`px-2 py-1 rounded-[3px] border font-bold transition-all ${
+                className={`px-2.5 py-1 rounded border font-medium transition-all ${
                   fairnessFloor <= (frontierSummary.bestAchievableMinVillageReach / 100 + 0.01) && fairnessFloor >= (frontierSummary.bestAchievableMinVillageReach / 100 - 0.02)
-                    ? 'bg-emerald-100 border-emerald-400 text-emerald-950 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold shadow-xs'
+                    : 'bg-white border-[#E2E8F0] text-[#475569] hover:bg-[#F8FAFC]'
                 }`}
               >
-                ✓ Max Feasible ({frontierSummary.bestAchievableMinVillageReach.toFixed(1)}%)
+                Max Feasible ({frontierSummary.bestAchievableMinVillageReach.toFixed(1)}%)
               </button>
               <button
                 onClick={() => setFairnessFloor(0.35)}
-                className={`px-2 py-1 rounded-[3px] border font-bold transition-all ${
+                className={`px-2.5 py-1 rounded border font-medium transition-all ${
                   Math.abs(fairnessFloor - 0.35) < 0.01
-                    ? 'bg-amber-100 border-amber-400 text-amber-950 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs'
+                    : 'bg-white border-[#E2E8F0] text-[#475569] hover:bg-[#F8FAFC]'
                 }`}
               >
-                ⚠ Standard 35% Floor (Shows Infeasible Shortfall)
+                Standard (35%)
               </button>
               <button
                 onClick={() => setFairnessFloor(0.50)}
-                className={`px-2 py-1 rounded-[3px] border font-bold transition-all ${
+                className={`px-2.5 py-1 rounded border font-medium transition-all ${
                   Math.abs(fairnessFloor - 0.50) < 0.01
-                    ? 'bg-red-100 border-red-400 text-red-950 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    ? 'bg-red-50 border-red-300 text-red-900 font-semibold shadow-xs'
+                    : 'bg-white border-[#E2E8F0] text-[#475569] hover:bg-[#F8FAFC]'
                 }`}
               >
-                Strict 50%
+                High Equity (50%)
               </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Assumed vs Computed Legend Bar */}
-        <div className="mt-4 pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[0.7rem] font-mono-numbers text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-700 uppercase">Assumed:</span>
-            <span>Channel benchmarks (cell 85%, FM 55%), vehicle speeds, resource unit costs.</span>
+      {/* 3. Recommended Recovery Plan Banner */}
+      <div className={`p-5 rounded-lg border shadow-xs space-y-3 ${
+        disadvantaged
+          ? 'bg-emerald-50/70 border-emerald-200'
+          : 'bg-blue-50/70 border-blue-200'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-emerald-600 shrink-0" />
+            <h4 className="font-bold text-sm text-[#172033]">
+              Recommended Policy: {disadvantaged ? 'Plan B (Fairness-Floor Optimizer)' : 'Plan A (Reach Maximizer)'}
+            </h4>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-700 uppercase">Computed:</span>
-            <span>BFS hop latencies, correlated cascading outages, Pareto frontiers.</span>
+          <StatusBadge
+            status="operational"
+            label={disadvantaged ? 'Equity Floor Enforced' : 'Maximum Reach Achieved'}
+          />
+        </div>
+
+        <p className="text-xs text-[#334155] leading-relaxed">
+          {comparisonInsight}
+        </p>
+
+        {/* Selected Interventions Preview */}
+        <div className="pt-2 border-t border-emerald-200/60 flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-medium text-[#172033]">Deployed Hardware ({planFairness.chosenInterventions.length} items):</span>
+          {planFairness.chosenInterventions.map(c => (
+            <span key={c.id} className="px-2 py-0.5 bg-white border border-emerald-300 rounded text-emerald-900 font-medium">
+              {c.label} ({c.cost}u)
+            </span>
+          ))}
+          {planFairness.chosenInterventions.length === 0 && (
+            <span className="text-[#64748B] italic">No interventions deployed within budget.</span>
+          )}
+        </div>
+      </div>
+
+      {/* 4. Plan Comparison (Side-by-Side: Plan A vs Plan B) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Plan A: Reach Maximiser */}
+        <div className="bg-white border border-[#E2E8F0] rounded-lg p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-[#172033]" />
+                <h3 className="font-bold text-sm text-[#172033]">
+                  Plan A: Reach Maximizer
+                </h3>
+              </div>
+              <span className="text-[11px] px-2 py-0.5 bg-[#F1F5F9] text-[#475569] rounded font-medium">
+                Average-Driven
+              </span>
+            </div>
+
+            <p className="text-xs text-[#64748B] my-3 leading-relaxed">
+              Greedy allocation targeting highest population-weighted gain per budget unit.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 my-3">
+              <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
+                <span className="text-[11px] text-[#64748B] block">Overall Reach:</span>
+                <span className="text-2xl font-bold text-[#172033] font-mono-numbers">
+                  {planReach.overallReachAfter}%
+                </span>
+                <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
+                  (+{(planReach.overallReachAfter - planReach.overallReachBefore).toFixed(1)}% gained)
+                </span>
+              </div>
+
+              <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
+                <span className="text-[11px] text-[#64748B] block">Weakest Settlement:</span>
+                <span className="text-2xl font-bold text-red-700 font-mono-numbers">
+                  {planReach.minVillageReachAfter.value}%
+                </span>
+                <span className="text-[11px] text-[#64748B] truncate block mt-0.5">
+                  ({planReach.minVillageReachAfter.name})
+                </span>
+              </div>
+            </div>
+
+            <div className="text-xs space-y-2 text-[#475569] py-2 border-y border-[#E2E8F0]">
+              <div className="flex justify-between">
+                <span>Budget Spent:</span>
+                <span className="font-semibold text-[#172033] font-mono-numbers">{planReach.totalCost} / {budget} units</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Marginal Efficiency:</span>
+                <span className="font-semibold text-[#172033] font-mono-numbers">+{planReach.gainPerCost} pts / unit</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Fairness Floor Status:</span>
+                <span className={`font-semibold ${planReach.floorMet ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {planReach.floorMet ? 'Satisfied' : `Deficit (${planReach.villagesBelowFloor.length} settlements neglected)`}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-[#E2E8F0]">
+            <span className="text-[11px] text-[#64748B] block mb-2 font-medium">
+              Deployed Actions ({planReach.chosenInterventions.length}):
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {planReach.chosenInterventions.map(c => (
+                <span key={c.id} className="text-[11px] px-2 py-0.5 bg-[#F1F5F9] text-[#172033] rounded border border-[#E2E8F0] font-medium">
+                  {c.label} ({c.cost}u)
+                </span>
+              ))}
+              {planReach.chosenInterventions.length === 0 && (
+                <span className="text-xs text-[#94A3B8] italic">None within budget</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Plan B: Fairness-Floor Optimizer */}
+        <div className="bg-white border-2 border-emerald-500 rounded-lg p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+              <div className="flex items-center gap-2">
+                <HeartHandshake className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-bold text-sm text-emerald-700">
+                  Plan B: Fairness-Floor Optimizer
+                </h3>
+              </div>
+              <span className="text-[11px] px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-semibold">
+                Protected Floor
+              </span>
+            </div>
+
+            <p className="text-xs text-[#64748B] my-3 leading-relaxed">
+              Guarantees reach &ge; {(fairnessFloor * 100).toFixed(0)}% across all communities before allocating surplus budget.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 my-3">
+              <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
+                <span className="text-[11px] text-[#64748B] block">Overall Reach:</span>
+                <span className="text-2xl font-bold text-[#172033] font-mono-numbers">
+                  {planFairness.overallReachAfter}%
+                </span>
+                <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
+                  (+{(planFairness.overallReachAfter - planFairness.overallReachBefore).toFixed(1)}% gained)
+                </span>
+              </div>
+
+              <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
+                <span className="text-[11px] text-[#64748B] block">Weakest Settlement:</span>
+                <span className="text-2xl font-bold text-emerald-700 font-mono-numbers">
+                  {planFairness.minVillageReachAfter.value}%
+                </span>
+                <span className="text-[11px] text-[#64748B] truncate block mt-0.5">
+                  ({planFairness.minVillageReachAfter.name})
+                </span>
+              </div>
+            </div>
+
+            <div className="text-xs space-y-2 text-[#475569] py-2 border-y border-[#E2E8F0]">
+              <div className="flex justify-between">
+                <span>Budget Spent:</span>
+                <span className="font-semibold text-[#172033] font-mono-numbers">{planFairness.totalCost} / {budget} units</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Floor Protection Level:</span>
+                <span className="font-semibold text-emerald-700 font-mono-numbers">&ge; {(fairnessFloor * 100).toFixed(0)}% Target</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Fairness Status:</span>
+                <span className={`font-semibold ${planFairness.floorMet ? 'text-emerald-700' : 'text-amber-700'}`}>
+                  {planFairness.floorMet ? 'All 8 Settlements Protected' : `Partial Compliance (${planFairness.villagesBelowFloor.length} below floor)`}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-[#E2E8F0]">
+            <span className="text-[11px] text-[#64748B] block mb-2 font-medium">
+              Deployed Actions ({planFairness.chosenInterventions.length}):
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {planFairness.chosenInterventions.map(c => (
+                <span key={c.id} className="text-[11px] px-2 py-0.5 bg-emerald-50 text-emerald-900 rounded border border-emerald-200 font-medium">
+                  {c.label} ({c.cost}u)
+                </span>
+              ))}
+              {planFairness.chosenInterventions.length === 0 && (
+                <span className="text-xs text-[#94A3B8] italic">None within budget</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Price of Fairness Frontier Section (SVG Chart & Benchmark Cards) */}
-      <div className="utility-card p-5 sm:p-6 rounded-lg space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200/80 gap-2">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-[var(--navy)]" />
-            <h3 className="font-heading font-bold text-base text-[var(--navy)] uppercase">
-              Price-of-Fairness Frontier & Optimizer Proof
-            </h3>
-          </div>
-          <span className="stamp-label stamp-simulation text-[0.6rem]">
-            PARETO TRADEOFF ANALYSIS
+      {/* 5. Before-and-After Community Impact Table */}
+      <div className="bg-white border border-[#E2E8F0] rounded-lg shadow-xs overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-[#E2E8F0] bg-[#F8FAFC] flex items-center justify-between">
+          <h4 className="font-semibold text-sm text-[#172033]">
+            Community Warning Reach: Baseline vs Plan A vs Plan B
+          </h4>
+          <span className="text-xs text-[#64748B]">
+            Fairness Target Floor: <strong className="font-mono-numbers text-[#172033]">{(fairnessFloor * 100).toFixed(0)}%</strong>
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left border-collapse">
+            <thead>
+              <tr className="border-b border-[#E2E8F0] text-[#64748B] bg-[#FAFCFE] font-medium">
+                <th className="p-3">Community</th>
+                <th className="p-3">Population</th>
+                <th className="p-3">Unmitigated Baseline</th>
+                <th className="p-3">Plan A (Reach Max)</th>
+                <th className="p-3 text-emerald-700">Plan B (Fairness Floor)</th>
+                <th className="p-3">Fairness Outcome</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E2E8F0]">
+              {planFairness.perVillageOutcomes.map((v, i) => {
+                const reachA = planReach.perVillageOutcomes[i]?.reachAfter ?? 0;
+                const reachB = v.reachAfter;
+                const meetsFloorB = v.meetsFloor;
+
+                return (
+                  <tr key={v.id} className="hover:bg-[#F8FAFC] transition-colors">
+                    <td className="p-3 font-semibold text-[#172033]">
+                      {v.name}
+                      {['thoni', 'hillcamp'].includes(v.id) && (
+                        <span className="ml-2 text-[11px] text-red-600 font-normal">
+                          (Isolated)
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-[#64748B] font-mono-numbers">
+                      {v.pop.toLocaleString()}
+                    </td>
+                    <td className="p-3 text-[#64748B] font-mono-numbers">
+                      {v.reachBefore}%
+                    </td>
+                    <td className="p-3 font-semibold text-[#172033] font-mono-numbers">
+                      {reachA}%
+                    </td>
+                    <td className="p-3 font-bold text-emerald-700 font-mono-numbers">
+                      {reachB}%
+                    </td>
+                    <td className="p-3">
+                      <StatusBadge
+                        status={meetsFloorB ? 'operational' : 'severed'}
+                        label={meetsFloorB ? 'Floor Met' : `Deficit (-${v.shortfall}%)`}
+                        size="sm"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 6. Expandable Algorithm Audit, Tradeoff Frontier & Optimization Proof */}
+      <details className="border border-[#E2E8F0] rounded-lg bg-white shadow-xs group overflow-hidden">
+        <summary className="p-4 bg-[#F8FAFC] flex items-center justify-between cursor-pointer select-none text-xs font-semibold text-[#172033] hover:bg-slate-100 transition-colors">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-[#2563EB]" />
+            <span>Algorithm Audit, Price-of-Fairness Curve & Optimization Proof</span>
+          </div>
+          <ChevronDown className="w-4 h-4 text-[#64748B] group-open:rotate-180 transition-transform" />
+        </summary>
+
+        <div className="p-5 sm:p-6 space-y-6 text-xs border-t border-[#E2E8F0]">
           {/* Native SVG Chart */}
-          <div className="lg:col-span-2 bg-slate-50 border border-slate-200 rounded-[4px] p-4 flex flex-col justify-between">
-            <div className="flex justify-between items-center mb-2 text-xs font-mono-numbers">
-              <span className="font-bold text-[var(--navy)]">Overall Regional Reach vs Minimum Community Reach</span>
-              <span className="text-[0.68rem] text-slate-500">Budget: {budget} Units</span>
+          <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-4">
+            <div className="flex justify-between items-center mb-3">
+              <span className="font-semibold text-[#172033]">Price-of-Fairness Tradeoff Curve</span>
+              <span className="text-[11px] text-[#64748B]">Capital Budget: {budget} Units</span>
             </div>
 
             <div className="w-full overflow-x-auto">
@@ -295,7 +526,7 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
                   return (
                     <polyline
                       fill="none"
-                      stroke="#123B63"
+                      stroke="#2563EB"
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -325,8 +556,8 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
                   const ay = 170 - (Math.min(40, planReach.overallReachAfter) / 40) * 145;
                   return (
                     <g>
-                      <circle cx={ax} cy={ay} r="6" fill="#123B63" stroke="#FFFFFF" strokeWidth="2" />
-                      <rect x={ax + 8} y={ay - 14} width="95" height="18" fill="#123B63" rx="2" />
+                      <circle cx={ax} cy={ay} r="6" fill="#1E293B" stroke="#FFFFFF" strokeWidth="2" />
+                      <rect x={ax + 8} y={ay - 14} width="95" height="18" fill="#1E293B" rx="3" />
                       <text x={ax + 12} y={ay - 1} fill="#FFFFFF" fontWeight="bold">
                         PLAN A: {planReach.overallReachAfter}%
                       </text>
@@ -341,7 +572,7 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
                   return (
                     <g>
                       <circle cx={bx} cy={by} r="6" fill="#059669" stroke="#FFFFFF" strokeWidth="2" />
-                      <rect x={bx - 105} y={by - 14} width="98" height="18" fill="#059669" rx="2" />
+                      <rect x={bx - 105} y={by - 14} width="98" height="18" fill="#059669" rx="3" />
                       <text x={bx - 101} y={by - 1} fill="#FFFFFF" fontWeight="bold">
                         PLAN B: {planFairness.overallReachAfter}%
                       </text>
@@ -350,343 +581,79 @@ export const DecisionEngineView: React.FC<DecisionEngineViewProps> = ({
                 })()}
 
                 {/* Axis Titles */}
-                <text x="255" y="198" textAnchor="middle" fill="#475569" fontWeight="600">
-                  Minimum Community Reach (Weakest Village %) →
+                <text x="255" y="198" textAnchor="middle" fill="#64748B" fontWeight="600">
+                  Minimum Community Reach (Weakest Settlement %) →
                 </text>
-                <text x="14" y="98" textAnchor="middle" transform="rotate(-90 14 98)" fill="#475569" fontWeight="600">
+                <text x="14" y="98" textAnchor="middle" transform="rotate(-90 14 98)" fill="#64748B" fontWeight="600">
                   Overall Regional Reach (%) →
                 </text>
               </svg>
             </div>
 
-            {/* Crucial Plain Sentence Summary */}
-            <div className="mt-3 p-3 bg-white border border-slate-200 rounded text-xs font-mono-numbers text-[var(--navy)] font-semibold shadow-2xs">
-              📊 <strong>Frontier Finding:</strong> {frontierSummary.plainSentence}
+            <div className="mt-3 p-3 bg-white border border-[#E2E8F0] rounded-md text-xs text-[#172033]">
+              <span className="font-semibold text-[#2563EB]">Frontier Finding:</span> {frontierSummary.plainSentence}
             </div>
           </div>
 
-          {/* Optimizer Rigour Proof & Benchmarking Card */}
-          <div className="bg-slate-50 border border-slate-200 rounded-[4px] p-4 font-mono-numbers text-xs space-y-3">
-            <div className="flex items-center gap-1.5 pb-2 border-b border-slate-200 text-[var(--navy)] font-bold">
-              <Cpu className="w-4 h-4 text-[var(--amber-text)]" />
-              <span>ALGORITHM BENCHMARKING</span>
-            </div>
-
-            <p className="text-[0.72rem] text-slate-600 leading-relaxed">
-              To prove the optimizer is doing genuine work rather than naive selection, we benchmark Plan A against standard baseline heuristics and exhaustive 2<sup>N</sup> search:
-            </p>
-
-            <div className="space-y-2 text-[0.72rem]">
-              <div className="p-2 bg-white rounded border border-slate-200">
-                <div className="flex justify-between font-bold text-slate-800">
-                  <span>1. Exhaustive Global Optimum:</span>
-                  <span className="text-emerald-700">{benchmarkResult.exhaustiveOptimal.maxReach}%</span>
-                </div>
-                <div className="text-slate-500 text-[0.68rem] mt-0.5">
-                  Evaluated all 256 intervention combinations. Optimality gap: <strong>{benchmarkResult.exhaustiveOptimal.optimalityGap}%</strong> ({benchmarkResult.exhaustiveOptimal.isPlanAOptimal ? 'Provably Optimal' : 'Near-Optimal'}).
-                </div>
+          {/* Algorithm Benchmarking Proof */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
+              <div className="flex justify-between font-semibold text-[#172033]">
+                <span>1. Exhaustive 2^N Optimal:</span>
+                <span className="text-emerald-700 font-mono-numbers">{benchmarkResult.exhaustiveOptimal.maxReach}%</span>
               </div>
-
-              <div className="p-2 bg-white rounded border border-slate-200">
-                <div className="flex justify-between font-bold text-slate-800">
-                  <span>2. Highest-Population-First:</span>
-                  <span>{benchmarkResult.highestPopFirst.reach}%</span>
-                </div>
-                <div className="text-slate-500 text-[0.68rem] mt-0.5">
-                  Spends {benchmarkResult.highestPopFirst.cost}u on largest coastal centres.
-                </div>
-              </div>
-
-              <div className="p-2 bg-white rounded border border-slate-200">
-                <div className="flex justify-between font-bold text-slate-800">
-                  <span>3. Cheapest-First Heuristic:</span>
-                  <span>{benchmarkResult.cheapestFirst.reach}%</span>
-                </div>
-                <div className="text-slate-500 text-[0.68rem] mt-0.5">
-                  Spends {benchmarkResult.cheapestFirst.cost}u on smallest cost assets. Falls {(planReach.overallReachAfter - benchmarkResult.cheapestFirst.reach).toFixed(1)} pts short of optimizer.
-                </div>
-              </div>
-            </div>
-
-            <div className="text-[0.68rem] text-slate-500 pt-1 border-t border-slate-200">
-              * SIMULATION · FICTIONAL DATA · Deterministic evaluation verified offline.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Model Insight Discovery Callout */}
-      <div className={`p-4 rounded-lg border text-xs leading-relaxed flex items-start gap-3 ${
-        disadvantaged
-          ? 'bg-amber-50/70 border-amber-300 text-amber-950'
-          : 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
-      }`}>
-        <Sparkles className={`w-5 h-5 shrink-0 mt-0.5 ${
-          disadvantaged ? 'text-[var(--amber-text)]' : 'text-[var(--green-text)]'
-        }`} />
-        <div>
-          <h4 className="font-heading font-bold text-sm uppercase tracking-wide mb-1">
-            Calculated Model Insight:
-          </h4>
-          <p className="font-mono-numbers text-[0.8rem]">
-            {comparisonInsight}
-          </p>
-        </div>
-      </div>
-
-      {/* Comparative Plans: Side-by-Side Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Plan A: Reach Maximiser */}
-        <div className="utility-card p-5 sm:p-6 rounded-lg flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-[var(--navy)]" />
-                <h3 className="font-heading font-bold text-base text-[var(--navy)] uppercase">
-                  Plan A: Reach Maximiser
-                </h3>
-              </div>
-              <span className="stamp-label stamp-simulation text-[0.6rem]">AVERAGE-DRIVEN</span>
-            </div>
-
-            <p className="text-xs text-[var(--muted)] my-3 leading-relaxed">
-              Greedy algorithm selecting interventions with highest marginal population reach per cost unit.
-            </p>
-
-            <div className="grid grid-cols-2 gap-3 my-4 font-mono-numbers">
-              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg">
-                <span className="text-[0.68rem] text-[var(--muted)] block uppercase">Overall Reach:</span>
-                <span className="text-2xl font-extrabold text-[var(--navy)]">
-                  {planReach.overallReachAfter}%
-                </span>
-                <span className="text-[0.7rem] text-[var(--green-text)] font-semibold block mt-0.5">
-                  (+{(planReach.overallReachAfter - planReach.overallReachBefore).toFixed(1)}% gained)
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg">
-                <span className="text-[0.68rem] text-[var(--muted)] block uppercase">Lowest Community:</span>
-                <span className="text-2xl font-extrabold text-[var(--red-text)]">
-                  {planReach.minVillageReachAfter.value}%
-                </span>
-                <span className="text-[0.7rem] text-[var(--muted)] truncate block mt-0.5">
-                  ({planReach.minVillageReachAfter.name})
-                </span>
-              </div>
-            </div>
-
-            <div className="text-xs font-mono-numbers space-y-2 text-slate-700 py-2 border-y border-slate-100">
-              <div className="flex justify-between">
-                <span>Budget Consumed:</span>
-                <span className="font-bold text-[var(--ink)]">{planReach.totalCost} / {budget} units</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Efficiency Ratio:</span>
-                <span className="font-bold text-[var(--navy)]">+{planReach.gainPerCost} pts / unit</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Fairness Floor Status:</span>
-                <span className={`font-bold ${planReach.floorMet ? 'text-[var(--green-text)]' : 'text-[var(--red-text)]'}`}>
-                  {planReach.floorMet ? 'SATISFIED' : `FAILED (${planReach.villagesBelowFloor.length} villages neglected)`}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <span className="text-[0.7rem] text-[var(--muted)] font-mono-numbers block mb-2 font-bold uppercase">
-              Selected Interventions ({planReach.chosenInterventions.length}):
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {planReach.chosenInterventions.map(c => (
-                <span key={c.id} className="text-[0.7rem] px-2 py-0.5 bg-slate-100 text-[var(--navy)] font-mono-numbers rounded border border-slate-200 font-semibold">
-                  {c.label} ({c.cost}u)
-                </span>
-              ))}
-              {planReach.chosenInterventions.length === 0 && (
-                <span className="text-xs text-slate-400 italic">None affordable within budget</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Plan B: Fairness-Floor Optimizer */}
-        <div className="utility-card p-5 sm:p-6 rounded-lg border-2 border-emerald-500/80 flex flex-col justify-between shadow-xs">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <HeartHandshake className="w-4 h-4 text-[var(--green-text)]" />
-                <h3 className="font-heading font-bold text-base text-[var(--green-text)] uppercase">
-                  Plan B: Fairness-Floor Optimizer
-                </h3>
-              </div>
-              <span className="stamp-label stamp-verified text-[0.6rem]">EQUITY-PROTECTED</span>
-            </div>
-
-            <p className="text-xs text-[var(--muted)] my-3 leading-relaxed">
-              Enforces MinReach &ge; {(fairnessFloor * 100).toFixed(0)}% across all communities before allocating remaining budget.
-            </p>
-
-            <div className="grid grid-cols-2 gap-3 my-4 font-mono-numbers">
-              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg">
-                <span className="text-[0.68rem] text-[var(--muted)] block uppercase">Overall Reach:</span>
-                <span className="text-2xl font-extrabold text-[var(--navy)]">
-                  {planFairness.overallReachAfter}%
-                </span>
-                <span className="text-[0.7rem] text-[var(--green-text)] font-semibold block mt-0.5">
-                  (+{(planFairness.overallReachAfter - planFairness.overallReachBefore).toFixed(1)}% gained)
-                </span>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded">
-                <span className="text-[0.68rem] text-[var(--muted)] block uppercase">Lowest Community:</span>
-                <span className="text-2xl font-extrabold text-[var(--green-text)]">
-                  {planFairness.minVillageReachAfter.value}%
-                </span>
-                <span className="text-[0.7rem] text-[var(--muted)] truncate block mt-0.5">
-                  ({planFairness.minVillageReachAfter.name})
-                </span>
-              </div>
-            </div>
-
-            <div className="text-xs font-mono-numbers space-y-2 text-slate-700 py-2 border-y border-slate-100">
-              <div className="flex justify-between">
-                <span>Budget Consumed:</span>
-                <span className="font-bold text-[var(--ink)]">{planFairness.totalCost} / {budget} units</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Floor Protection Level:</span>
-                <span className="font-bold text-[var(--green-text)]">&ge; {(fairnessFloor * 100).toFixed(0)}% Target</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Fairness Floor Status:</span>
-                <span className={`font-bold ${planFairness.floorMet ? 'text-[var(--green-text)]' : 'text-[var(--amber-text)]'}`}>
-                  {planFairness.floorMet ? 'ALL 8 COMMUNITIES PROTECTED' : `PARTIAL COMPLIANCE (${planFairness.villagesBelowFloor.length} below)`}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <span className="text-[0.7rem] text-[var(--muted)] font-mono-numbers block mb-2 font-bold uppercase">
-              Selected Interventions ({planFairness.chosenInterventions.length}):
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {planFairness.chosenInterventions.map(c => (
-                <span key={c.id} className="text-[0.7rem] px-2 py-0.5 bg-emerald-50 text-[var(--green-text)] font-mono-numbers rounded border border-emerald-200 font-semibold">
-                  {c.label} ({c.cost}u)
-                </span>
-              ))}
-              {planFairness.chosenInterventions.length === 0 && (
-                <span className="text-xs text-slate-400 italic">None affordable within budget</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Community-by-Community Comparison Table */}
-      <div className="utility-card rounded-lg shadow-xs overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-200/80 bg-slate-50 flex items-center justify-between">
-          <h4 className="font-heading font-bold text-sm text-[var(--navy)] uppercase">
-            Community Reach Comparison Under Both Plans
-          </h4>
-          <span className="text-xs font-mono-numbers text-[var(--muted)]">
-            Fairness Target Floor: {(fairnessFloor * 100).toFixed(0)}%
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs font-mono-numbers text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200/80 text-[var(--navy)] bg-slate-50/50">
-                <th className="p-3 font-bold">Community</th>
-                <th className="p-3 font-bold">Population</th>
-                <th className="p-3 font-bold">Unmitigated Baseline</th>
-                <th className="p-3 font-bold">Plan A (Reach Max)</th>
-                <th className="p-3 font-bold text-[var(--green-text)]">Plan B (Fairness Floor)</th>
-                <th className="p-3 font-bold">Fairness Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {planFairness.perVillageOutcomes.map((v, i) => {
-                const reachA = planReach.perVillageOutcomes[i]?.reachAfter ?? 0;
-                const reachB = v.reachAfter;
-                const meetsFloorB = v.meetsFloor;
-
-                return (
-                  <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="p-3 font-heading font-bold text-sm text-[var(--navy)]">
-                      {v.name}
-                      {['thoni', 'hillcamp'].includes(v.id) && (
-                        <span className="ml-2 text-[0.65rem] text-[var(--red-text)] font-mono-numbers font-normal">
-                          [ISOLATED]
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-[var(--muted)]">
-                      {v.pop.toLocaleString()}
-                    </td>
-                    <td className="p-3 text-slate-500">
-                      {v.reachBefore}%
-                    </td>
-                    <td className="p-3 font-bold text-[var(--navy)]">
-                      {reachA}%
-                    </td>
-                    <td className="p-3 font-extrabold text-[var(--green-text)]">
-                      {reachB}%
-                    </td>
-                    <td className="p-3">
-                      {meetsFloorB ? (
-                        <span className="stamp-label stamp-verified text-[0.6rem]">FLOOR MET</span>
-                      ) : (
-                        <span className="stamp-label stamp-critical text-[0.6rem]">
-                          DEFICIT (-{v.shortfall}%)
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Decision Audit Log (Why each intervention was chosen step-by-step) */}
-      <div className="utility-card p-5 sm:p-6 rounded-lg space-y-3">
-        <h4 className="font-heading font-bold text-sm text-[var(--navy)] uppercase flex items-center gap-1.5">
-          <ChevronRight className="w-4 h-4 text-[var(--amber-text)]" />
-          Plan B Algorithmic Decision Audit (Step-by-Step Reason Log)
-        </h4>
-
-        <div className="space-y-2 font-mono-numbers text-xs">
-          {planFairness.steps.map((st) => (
-            <div key={st.stepNumber} className="p-3 bg-slate-50 border border-slate-200/80 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-[var(--navy)] text-white text-[0.7rem] font-bold rounded">
-                  Step {st.stepNumber}
-                </span>
-                <span className="font-bold text-[var(--ink)]">
-                  {st.label}
-                </span>
-                <span className="text-[var(--muted)] font-semibold">
-                  (-{st.cost}u, {st.remainingBudget}u left)
-                </span>
-              </div>
-              <p className="text-[0.75rem] text-slate-600 md:text-right">
-                {st.reason}
+              <p className="text-[#64748B] text-[11px] mt-1">
+                256 intervention subsets evaluated. Gap: <strong className="font-mono-numbers">{benchmarkResult.exhaustiveOptimal.optimalityGap}%</strong> ({benchmarkResult.exhaustiveOptimal.isPlanAOptimal ? 'Provably Optimal' : 'Near-Optimal'}).
               </p>
             </div>
-          ))}
 
-          {planFairness.steps.length === 0 && (
-            <div className="text-slate-400 italic text-xs p-3">
-              No interventions could be selected within the available budget.
+            <div className="p-3 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
+              <div className="flex justify-between font-semibold text-[#172033]">
+                <span>2. Highest-Pop First:</span>
+                <span className="font-mono-numbers">{benchmarkResult.highestPopFirst.reach}%</span>
+              </div>
+              <p className="text-[#64748B] text-[11px] mt-1">
+                Spends {benchmarkResult.highestPopFirst.cost}u on largest coastal centres.
+              </p>
             </div>
-          )}
+
+            <div className="p-3 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
+              <div className="flex justify-between font-semibold text-[#172033]">
+                <span>3. Cheapest First:</span>
+                <span className="font-mono-numbers">{benchmarkResult.cheapestFirst.reach}%</span>
+              </div>
+              <p className="text-[#64748B] text-[11px] mt-1">
+                Spends {benchmarkResult.cheapestFirst.cost}u on cheapest assets. Falls {(planReach.overallReachAfter - benchmarkResult.cheapestFirst.reach).toFixed(1)} pts short.
+              </p>
+            </div>
+          </div>
+
+          {/* Step-by-Step Reason Log */}
+          <div className="space-y-2">
+            <h5 className="font-semibold text-xs text-[#172033]">
+              Plan B Step-by-Step Allocation Reason Log
+            </h5>
+            {planFairness.steps.map((st) => (
+              <div key={st.stepNumber} className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-[#172033] text-white text-[11px] font-semibold rounded">
+                    Step {st.stepNumber}
+                  </span>
+                  <span className="font-semibold text-[#172033]">
+                    {st.label}
+                  </span>
+                  <span className="text-[#64748B]">
+                    (-{st.cost}u, {st.remainingBudget}u remaining)
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#475569] md:text-right">
+                  {st.reason}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      </details>
     </div>
   );
 };

@@ -1,13 +1,7 @@
-/**
- * PEREGRINE — Silence Clock Grid (Section 8)
- * Displays per-village modelled hours with NO available warning path
- * Using retro-utility odometer-drum chambers and clean typography.
- */
-
 import React, { useState, useMemo } from 'react';
 import { S72VillageSummary, S72HourlyStep } from '../../model/graph';
-import { analyzeVillageSilenceTimeline } from '../../metrics/silence';
-import { Clock, AlertTriangle, ArrowDownUp, ShieldCheck, Activity } from 'lucide-react';
+import { ArrowUpDown, ChevronRight, Activity, Clock } from 'lucide-react';
+import { StatusBadge } from '../ui/StatusBadge';
 
 interface SilenceClockGridProps {
   villages: S72VillageSummary[];
@@ -25,238 +19,276 @@ export const SilenceClockGrid: React.FC<SilenceClockGridProps> = ({
   onSelectVillage,
   selectedVillageId
 }) => {
-  const [sortOrder, setSortOrder] = useState<'worst-first' | 'best-first' | 'population'>('worst-first');
+  const [sortField, setSortField] = useState<'silence' | 'pop' | 'channels'>('silence');
+  const [sortAsc, setSortAsc] = useState<boolean>(false);
+
+  // Compute per-village longest silence streak and continuous silence if steps are provided
+  const villageStats = useMemo(() => {
+    return villages.map(v => {
+      let longestSilence = v.silenceHours;
+      let initialSilence = 0;
+      const hourlyPath = steps ? steps.map(s => Boolean(s.villagePaths[v.id])) : [];
+
+      if (steps && steps.length > 0) {
+        let currentStreak = 0;
+        let maxStreak = 0;
+        let countingInitial = true;
+
+        for (let i = 0; i < hourlyPath.length; i++) {
+          if (!hourlyPath[i]) {
+            currentStreak++;
+            maxStreak = Math.max(maxStreak, currentStreak);
+            if (countingInitial) {
+              initialSilence++;
+            }
+          } else {
+            currentStreak = 0;
+            countingInitial = false;
+          }
+        }
+        longestSilence = maxStreak;
+      }
+
+      return {
+        ...v,
+        longestSilence,
+        initialSilence,
+        hourlyPath
+      };
+    });
+  }, [villages, steps]);
 
   const sortedVillages = useMemo(() => {
-    return [...villages].sort((a, b) => {
-      if (sortOrder === 'worst-first') return b.silenceHours - a.silenceHours;
-      if (sortOrder === 'best-first') return a.silenceHours - b.silenceHours;
-      return b.pop - a.pop;
+    return [...villageStats].sort((a, b) => {
+      let diff = 0;
+      if (sortField === 'silence') {
+        diff = b.silenceHours - a.silenceHours;
+      } else if (sortField === 'pop') {
+        diff = b.pop - a.pop;
+      } else if (sortField === 'channels') {
+        diff = a.availableChannelsNow - b.availableChannelsNow;
+      }
+      return sortAsc ? -diff : diff;
     });
-  }, [villages, sortOrder]);
+  }, [villageStats, sortField, sortAsc]);
 
-  const totalSilentPop = useMemo(() => {
-    return villages
-      .filter(v => v.silenceHours === totalScenarioHours)
-      .reduce((sum, v) => sum + v.pop, 0);
-  }, [villages, totalScenarioHours]);
+  const handleSort = (field: 'silence' | 'pop' | 'channels') => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(false);
+    }
+  };
 
   return (
-    <div className="utility-card p-5 sm:p-6 space-y-5 rounded-[4px] border border-[var(--border)]">
-      {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[var(--border)] gap-2">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-[3px] bg-[#0C2A47] text-white flex items-center justify-center shadow-xs">
-            <Clock className="w-4 h-4 text-[var(--amber)]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-heading font-bold text-base text-[var(--navy)] uppercase tracking-wide">
-                Silence Clock Grid (All 8 Settlements)
-              </h3>
-              <span className="stamp-label stamp-simulation">HUMAN IMPACT METRIC</span>
-            </div>
-            <p className="text-xs text-[var(--muted)]">
-              Modelled 72-hour outage analysis: continuous silence, longest blackout intervals, and surviving broadcast paths.
-            </p>
-          </div>
+    <div className="bg-white border border-[#E2E8F0] rounded-lg shadow-xs overflow-hidden">
+      {/* Table Control Header */}
+      <div className="p-4 border-b border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#F8FAFC]">
+        <div>
+          <h3 className="text-sm font-semibold text-[#172033]">
+            Settlement Outage Matrix & Silence Duration
+          </h3>
+          <p className="text-xs text-[#64748B] mt-0.5">
+            Continuous and cumulative modeled hours with zero surviving warning paths across the 72-hour window.
+          </p>
         </div>
 
-        {/* Sort Controls */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-[3px] text-xs font-mono-numbers border border-[var(--border)]">
-          <span className="text-[var(--muted)] px-1.5 flex items-center gap-1 text-[0.7rem] font-semibold">
-            <ArrowDownUp className="w-3 h-3" /> SORT:
+        {/* Quick Sorting Badges */}
+        <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] rounded-md p-1 text-xs">
+          <span className="text-[#64748B] px-2 flex items-center gap-1 font-medium">
+            <ArrowUpDown className="w-3.5 h-3.5" /> Sort:
           </span>
           <button
-            onClick={() => setSortOrder('worst-first')}
-            aria-pressed={sortOrder === 'worst-first'}
-            className={`px-2.5 py-1 rounded-[2px] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--amber)] ${
-              sortOrder === 'worst-first'
-                ? 'bg-white text-[var(--navy)] shadow-xs font-bold'
-                : 'text-slate-600 hover:text-[var(--ink)]'
+            onClick={() => handleSort('silence')}
+            className={`px-2.5 py-1 rounded transition-colors ${
+              sortField === 'silence'
+                ? 'bg-[#EFF6FF] text-[#2563EB] font-semibold'
+                : 'text-[#64748B] hover:text-[#172033]'
             }`}
           >
-            Worst First
+            Outage Hours {sortField === 'silence' && (sortAsc ? '↑' : '↓')}
           </button>
           <button
-            onClick={() => setSortOrder('best-first')}
-            aria-pressed={sortOrder === 'best-first'}
-            className={`px-2.5 py-1 rounded-[2px] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--amber)] ${
-              sortOrder === 'best-first'
-                ? 'bg-white text-[var(--navy)] shadow-xs font-bold'
-                : 'text-slate-600 hover:text-[var(--ink)]'
+            onClick={() => handleSort('pop')}
+            className={`px-2.5 py-1 rounded transition-colors ${
+              sortField === 'pop'
+                ? 'bg-[#EFF6FF] text-[#2563EB] font-semibold'
+                : 'text-[#64748B] hover:text-[#172033]'
             }`}
           >
-            Lowest Silence
+            Population {sortField === 'pop' && (sortAsc ? '↑' : '↓')}
           </button>
           <button
-            onClick={() => setSortOrder('population')}
-            aria-pressed={sortOrder === 'population'}
-            className={`px-2.5 py-1 rounded-[2px] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--amber)] ${
-              sortOrder === 'population'
-                ? 'bg-white text-[var(--navy)] shadow-xs font-bold'
-                : 'text-slate-600 hover:text-[var(--ink)]'
+            onClick={() => handleSort('channels')}
+            className={`px-2.5 py-1 rounded transition-colors ${
+              sortField === 'channels'
+                ? 'bg-[#EFF6FF] text-[#2563EB] font-semibold'
+                : 'text-[#64748B] hover:text-[#172033]'
             }`}
           >
-            Population
+            Channels {sortField === 'channels' && (sortAsc ? '↑' : '↓')}
           </button>
         </div>
       </div>
 
-      {/* Summary Banner */}
-      <div className="p-3.5 bg-slate-50 border border-[var(--border)] rounded-[3px] flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono-numbers gap-1.5">
-        <span className="text-[var(--navy)] font-semibold flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-[var(--red)] animate-pulse" />
-          POPULATION UNDER 72-HOUR COMPLETE WARNING BLACKOUT:
-        </span>
-        <span className="font-bold text-sm text-[var(--navy-deep)]">
-          {totalSilentPop.toLocaleString()} residents ({((totalSilentPop / 19900) * 100).toFixed(1)}% of total fictional population)
-        </span>
+      {/* Settlements Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[#64748B] font-medium">
+              <th className="py-3 px-4">Settlement</th>
+              <th className="py-3 px-4">Population</th>
+              <th className="py-3 px-4">Communication State</th>
+              <th className="py-3 px-4">Continuous Silence</th>
+              <th className="py-3 px-4">Total 72h Outage</th>
+              <th className="py-3 px-4 min-w-[200px]">72h Availability Timeline</th>
+              <th className="py-3 px-4">Channels</th>
+              <th className="py-3 px-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#E2E8F0]">
+            {sortedVillages.map((v) => {
+              const isSelected = selectedVillageId === v.id;
+              const isTotalBlackout = v.silenceHours === totalScenarioHours;
+              const isPartialBlackout = v.silenceHours > 0 && v.silenceHours < totalScenarioHours;
+              const status = isTotalBlackout ? 'severed' : isPartialBlackout ? 'degraded' : 'operational';
+
+              return (
+                <tr
+                  key={v.id}
+                  onClick={() => onSelectVillage && onSelectVillage(v.id)}
+                  className={`cursor-pointer transition-colors ${
+                    isSelected
+                      ? 'bg-[#EFF6FF]'
+                      : 'hover:bg-[#F8FAFC]'
+                  }`}
+                >
+                  {/* Settlement */}
+                  <td className="py-3 px-4">
+                    <div className="font-semibold text-[#172033] flex items-center gap-1.5">
+                      {v.name}
+                      {isSelected && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />
+                      )}
+                    </div>
+                    <div className="text-[11px] text-[#64748B] font-mono-numbers">
+                      ID: {v.id}
+                    </div>
+                  </td>
+
+                  {/* Population */}
+                  <td className="py-3 px-4 font-mono-numbers text-[#172033]">
+                    {v.pop.toLocaleString()}
+                  </td>
+
+                  {/* Current State */}
+                  <td className="py-3 px-4">
+                    <StatusBadge
+                      status={status}
+                      label={isTotalBlackout ? 'Blackout' : isPartialBlackout ? 'Degraded' : 'Operational'}
+                      size="sm"
+                    />
+                  </td>
+
+                  {/* Continuous Silence Streak */}
+                  <td className="py-3 px-4 font-mono-numbers">
+                    <span className={v.longestSilence > 0 ? 'text-red-700 font-semibold' : 'text-slate-700'}>
+                      {v.longestSilence}h
+                    </span>
+                    <span className="text-[11px] text-[#64748B] ml-1">longest streak</span>
+                  </td>
+
+                  {/* Total 72h Outage */}
+                  <td className="py-3 px-4 font-mono-numbers">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-semibold ${
+                        isTotalBlackout ? 'text-red-700' : isPartialBlackout ? 'text-amber-700' : 'text-emerald-700'
+                      }`}>
+                        {v.silenceHours}h
+                      </span>
+                      <span className="text-[11px] text-[#64748B]">/ {totalScenarioHours}h</span>
+                    </div>
+                    <div className="w-20 bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
+                      <div
+                        className={`h-full ${isTotalBlackout ? 'bg-red-500' : isPartialBlackout ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${(v.silenceHours / totalScenarioHours) * 100}%` }}
+                      />
+                    </div>
+                  </td>
+
+                  {/* 72h Availability Timeline Bar */}
+                  <td className="py-3 px-4">
+                    {v.hourlyPath.length > 0 ? (
+                      <div>
+                        <div className="flex h-2 rounded overflow-hidden bg-slate-100 gap-px">
+                          {v.hourlyPath.map((isUp, idx) => (
+                            <div
+                              key={idx}
+                              title={`Hour ${idx}: ${isUp ? 'Operational Path Available' : 'No Operational Path (Silence)'}`}
+                              className={`flex-1 ${isUp ? 'bg-emerald-500' : 'bg-red-500'}`}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex justify-between text-[10px] text-[#94A3B8] font-mono-numbers mt-0.5">
+                          <span>0h</span>
+                          <span>24h</span>
+                          <span>48h</span>
+                          <span>72h</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-[#94A3B8] text-[11px]">Timeline unavailable</span>
+                    )}
+                  </td>
+
+                  {/* Channels */}
+                  <td className="py-3 px-4 font-mono-numbers text-[#172033]">
+                    <span className={v.availableChannelsNow === 0 ? 'text-red-600 font-semibold' : ''}>
+                      {v.availableChannelsNow}
+                    </span>
+                    <span className="text-[#64748B]"> / {v.nominalChannels}</span>
+                  </td>
+
+                  {/* Action */}
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectVillage && onSelectVillage(v.id);
+                      }}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        isSelected
+                          ? 'bg-[#2563EB] text-white shadow-xs'
+                          : 'bg-white border border-[#E2E8F0] text-[#172033] hover:bg-[#F8FAFC]'
+                      }`}
+                    >
+                      {isSelected ? 'Selected' : 'Inspect'}
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Grid of 8 Village Silence Clocks */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {sortedVillages.map(v => {
-          const isTotalSilence = v.silenceHours === totalScenarioHours;
-          const isZeroSilence = v.silenceHours === 0;
-          const isSelected = selectedVillageId === v.id;
-
-          // Derive timeline analysis if steps are available
-          const timelineAnalysis = steps ? analyzeVillageSilenceTimeline(
-            v.id,
-            steps.map(s => Boolean(s.villagePaths[v.id])),
-            steps.map(s => s.villageReach[v.id] ?? 0)
-          ) : null;
-
-          return (
-            <div
-              key={v.id}
-              role="button"
-              tabIndex={0}
-              aria-pressed={isSelected}
-              aria-label={`Select settlement ${v.name}. Population: ${v.pop}. Silence: ${v.silenceHours} hours.`}
-              onClick={() => onSelectVillage && onSelectVillage(v.id)}
-              onKeyDown={(e) => {
-                if ((e.key === 'Enter' || e.key === ' ') && onSelectVillage) {
-                  e.preventDefault();
-                  onSelectVillage(v.id);
-                }
-              }}
-              className={`p-3.5 rounded-[3px] border transition-all cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--amber)] ${
-                isTotalSilence
-                  ? 'border-red-200 bg-red-50/40 hover:border-red-300'
-                  : isZeroSilence
-                  ? 'border-emerald-200 bg-emerald-50/40 hover:border-emerald-300'
-                  : 'border-[var(--border)] bg-white hover:border-slate-300 hover:shadow-xs'
-              } ${isSelected ? 'ring-2 ring-[var(--amber)] ring-offset-1 shadow-sm' : ''}`}
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-1.5">
-                <div>
-                  <h4 className="font-heading font-bold text-sm text-[var(--navy)] leading-tight">
-                    {v.name}
-                  </h4>
-                  <span className="text-[0.68rem] font-mono-numbers text-[var(--muted)]">
-                    Fictional Pop: {v.pop.toLocaleString()}
-                  </span>
-                </div>
-                {isTotalSilence ? (
-                  <span className="stamp-label stamp-critical text-[0.55rem]">72h SILENCE</span>
-                ) : isZeroSilence ? (
-                  <span className="stamp-label stamp-verified text-[0.55rem]">PROTECTED</span>
-                ) : (
-                  <span className="stamp-label stamp-warning text-[0.55rem]">DEGRADED</span>
-                )}
-              </div>
-
-              {/* Odometer Chamber */}
-              <div className="odometer-chamber px-2.5 py-1.5 my-2 flex items-center justify-between">
-                <span className="text-[0.62rem] text-slate-400 uppercase tracking-widest">
-                  TOTAL SILENCE:
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span
-                    className={`text-xl font-bold tracking-wider ${
-                      isTotalSilence
-                        ? 'text-[#FFA1A1]'
-                        : isZeroSilence
-                        ? 'text-[#88E4B0]'
-                        : 'text-[var(--amber)]'
-                    }`}
-                  >
-                    {String(v.silenceHours).padStart(2, '0')}
-                  </span>
-                  <span className="text-xs text-slate-400">/ 72h</span>
-                </div>
-              </div>
-
-              {/* Durations Breakdown (Continuous initial vs Longest period) */}
-              {timelineAnalysis && (
-                <div className="text-[0.65rem] font-mono-numbers text-slate-600 bg-slate-50 p-1.5 rounded-[2px] border border-slate-200 space-y-0.5">
-                  <div className="flex justify-between">
-                    <span>Initial Continuous:</span>
-                    <span className="font-bold text-[var(--navy)]">{timelineAnalysis.continuousSilenceDuration}h</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Longest Outage Run:</span>
-                    <span className="font-bold text-[var(--navy)]">{timelineAnalysis.longestSilencePeriod}h</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Mini 72-Hour Timeline Strip */}
-              {timelineAnalysis && (
-                <div className="my-2">
-                  <div className="flex justify-between text-[0.58rem] font-mono-numbers text-slate-500 mb-0.5">
-                    <span>0h</span>
-                    <span>24h</span>
-                    <span>48h</span>
-                    <span>72h</span>
-                  </div>
-                  <div 
-                    className="flex h-2.5 w-full rounded-[1px] overflow-hidden bg-slate-200 border border-slate-300" 
-                    title={`72-Hour Timeline: ${v.silenceHours}h silence, ${72 - v.silenceHours}h active`}
-                  >
-                    {timelineAnalysis.hourlyStatus.map(slot => (
-                      <div
-                        key={slot.hour}
-                        className={`flex-1 h-full ${
-                          slot.status === 'SILENCE'
-                            ? 'bg-red-500'
-                            : slot.status === 'DEGRADED'
-                            ? 'bg-amber-400'
-                            : 'bg-emerald-500'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Channels Status Summary */}
-              <div className="mt-2 text-[0.68rem] font-mono-numbers text-slate-600 flex items-center justify-between pt-1 border-t border-slate-100">
-                <span>Channels Nominal / Live:</span>
-                <span className="font-bold text-[var(--navy)]">{v.nominalChannels} / {v.availableChannelsNow}</span>
-              </div>
-
-              {/* Progress Bar (if no timeline) */}
-              {!timelineAnalysis && (
-                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-2">
-                  <div
-                    className={`h-full ${
-                      isTotalSilence
-                        ? 'bg-[var(--red)]'
-                        : isZeroSilence
-                        ? 'bg-[var(--green)]'
-                        : 'bg-[var(--amber)]'
-                    }`}
-                    style={{ width: `${(v.silenceHours / totalScenarioHours) * 100}%` }}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+      {/* Table Footer with Legend */}
+      <div className="p-3 border-t border-[#E2E8F0] bg-[#F8FAFC] flex flex-wrap items-center justify-between text-[11px] text-[#64748B]">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500 inline-block" />
+            <span>Path Available (Operational)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-xs bg-red-500 inline-block" />
+            <span>Zero Warning Path (Silence)</span>
+          </div>
+        </div>
+        <div>
+          Click any row to load root-cause analysis and targeted interventions below.
+        </div>
       </div>
     </div>
   );

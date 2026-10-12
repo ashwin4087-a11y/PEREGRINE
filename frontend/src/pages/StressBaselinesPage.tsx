@@ -1,14 +1,10 @@
-/**
- * PEREGRINE — Stress Benchmarks & Sensitivity Analysis Page (Section 11)
- * Baseline comparisons (A, B, C vs PEREGRINE), ±30% input sensitivity stress-testing,
- * and reproducible audit slips with cryptographic checksums.
- */
-
 import React from 'react';
 import { SystemConfig } from '../model/config';
 import { NetworkFailureState, S30Result, S72Result } from '../model/types';
 import { ExperimentLogView } from '../components/experiments/ExperimentLogView';
 import { SensitivityPanel } from '../components/experiments/SensitivityPanel';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatusBadge } from '../components/ui/StatusBadge';
 
 interface StressBaselinesPageProps {
   config: SystemConfig;
@@ -26,22 +22,23 @@ export const StressBaselinesPage: React.FC<StressBaselinesPageProps> = ({
   onUpdateConfig
 }) => {
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col md:flex-row md:items-end justify-between pb-4 border-b border-[var(--border)] gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="font-heading font-extrabold text-2xl text-[var(--navy)] tracking-tight">
-              Stress Benchmarks &amp; Sensitivity Analysis
-            </h2>
-            <span className="stamp-label stamp-simulation">STRESS BENCH</span>
-          </div>
-          <p className="text-xs text-[var(--muted)] mt-1 max-w-3xl leading-relaxed">
-            Formal baseline comparisons (A, B, C vs PEREGRINE), ±30% input sensitivity stress-testing, and reproducible audit slips.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <PageHeader
+        title="Stress Benchmarks & Sensitivity Analysis"
+        category="Robustness & Empirical Testing"
+        description="Formal baseline comparisons (A, B, C vs PEREGRINE), ±30% multi-parameter input sensitivity stress-testing, and reproducible audit slips with cryptographic checksums."
+        statusBadge={
+          <StatusBadge
+            status="operational"
+            label="Deterministic Stress Bench"
+          />
+        }
+      />
 
+      {/* SECTION A: Baseline Architecture Comparison */}
       <ExperimentLogView
+        section="A"
         config={config}
         s30Score={s30Result.resilienceScore}
         s72Reach={s72Result.overallReach}
@@ -50,7 +47,19 @@ export const StressBaselinesPage: React.FC<StressBaselinesPageProps> = ({
         failures={failures}
       />
 
+      {/* SECTION B: Sensitivity Parameters and Scenario Execution */}
       <SensitivityPanel config={config} onUpdateConfig={onUpdateConfig} />
+
+      {/* SECTION C: Experiment Results, Conclusions, and Reproducibility */}
+      <ExperimentLogView
+        section="C"
+        config={config}
+        s30Score={s30Result.resilienceScore}
+        s72Reach={s72Result.overallReach}
+        silenceCount={s72Result.villages.filter(v => v.silenceHours === 72).length}
+        budgetUnits={config.planning.defaultBudget}
+        failures={failures}
+      />
     </div>
   );
 };
